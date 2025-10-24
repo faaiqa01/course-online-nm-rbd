@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Detail Siswa: {{ student.name }}</h2>
+    <h3>Kursus: {{ course.title }}</h3>
+    <hr>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Informasi Siswa
+        </div>
+        <div class="card-body">
+            <p><strong>Nama:</strong> {{ student.name }}</p>
+            <p><strong>Email:</strong> {{ student.email }}</p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Progress Kursus
+        </div>
+        <div class="card-body">
+            <p><strong>Total Materi:</strong> {{ lessons|length }}</p>
+            <p><strong>Materi Diselesaikan:</strong> {{ completed_materials|length }}</p>
+            <div class="progress-display">
+                <div class="progress-bar" role="progressbar" aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar-fill" style="width: {{ progress_percent }}%;"></div>
+                </div>
+                <span class="progress-value">{{ progress_percent }}%</span>
+            </div>
+            <h4>Materi yang Diselesaikan:</h4>
+            {% if completed_materials %}
+            <ul>
+                {% for material in completed_materials %}
+                <li>{{ material }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>Belum ada materi yang diselesaikan oleh siswa ini.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Informasi Kuis
+        </div>
+        <div class="card-body">
+            {% if latest_attempt %}
+            <p><strong>Nilai Kuis Terakhir:</strong> {{ latest_attempt.score }}</p>
+            <p><strong>Status:</strong> {% if latest_attempt.passed %}Lulus{% else %}Tidak Lulus{% endif %}</p>
+            <p><strong>Tanggal Pengerjaan:</strong> {{ latest_attempt.created_at.strftime('%d-%m-%Y %H:%M') }}</p>
+            {% else %}
+            <p>Siswa ini belum pernah mengerjakan kuis untuk kursus ini.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Informasi Latihan
+        </div>
+        <div class="card-body">
+            {% if exercise_submission %}
+            <p><strong>Link Latihan:</strong> <a href="{{ exercise_submission.submission_url }}" target="_blank">{{ exercise_submission.submission_url }}</a></p>
+            <form action="{{ url_for('update_exercise_score', course_id=course.id, user_id=student.id) }}" method="POST">
+                <div class="mb-3">
+                    <label for="exercise_score" class="form-label">Nilai Latihan:</label>
+                    <input type="number" class="form-control" id="exercise_score" name="exercise_score" value="{{ exercise_submission.score }}" min="0" max="100">
+                </div>
+                <button type="submit" class="btn btn-success">Simpan Nilai</button>
+            </form>
+            {% else %}
+            <p>Siswa ini belum mengirimkan latihan untuk kursus ini.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <a href="{{ url_for('manage_enrollments', course_id=course.id) }}" class="btn btn-secondary mt-3">Kembali ke Daftar Siswa</a>
+</div>
+{% endblock %}

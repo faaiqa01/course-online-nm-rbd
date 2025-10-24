@@ -1,0 +1,273 @@
+﻿{% extends "base.html" %}
+{% block content %}
+<h2>Semua Kursus</h2>
+
+<div style="margin-bottom: 1rem;">
+  <button id="toggle-filter-btn" class="btn">Filter</button>
+</div>
+
+<div id="filter-section" style="display: none;">
+  <form method="get" action="{{ url_for('courses') }}">
+    <div style="margin-bottom: 1rem;">
+      <div style="margin-bottom: 0.5rem;">
+        <select name="material_type">
+          <option value="">Semua Jenis Materi</option>
+          <option value="Microsoft Office 2021" {% if selected_material_type == 'Microsoft Office 2021' %}selected{% endif %}>Microsoft Office 2021</option>
+          <option value="Microsoft Word" {% if selected_material_type == 'Microsoft Word' %}selected{% endif %}>Microsoft Word</option>
+          <option value="Microsoft Excel" {% if selected_material_type == 'Microsoft Excel' %}selected{% endif %}>Microsoft Excel</option>
+          <option value="Microsoft PowerPoint" {% if selected_material_type == 'Microsoft PowerPoint' %}selected{% endif %}>Microsoft PowerPoint</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <select name="is_premium">
+          <option value="">Semua Jenis Kursus</option>
+          <option value="yes" {% if selected_is_premium == 'yes' %}selected{% endif %}>Premium</option>
+          <option value="no" {% if selected_is_premium == 'no' %}selected{% endif %}>Gratis</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <input type="search" name="search" placeholder="Cari judul kursus..." value="{{ search_query }}">
+      </div>
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="submit" class="btn primary">Simpan</button>
+        <a href="{{ url_for('courses') }}" class="btn secondary">Reset Filter</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if courses %}
+  {% for c in courses %}
+    <div class="card course-card">
+      {% set thumb = c.thumbnail_path %}
+      {% if thumb %}
+        <div class="course-card-thumb">
+          {% if thumb.startswith('http') %}
+            <img src="{{ thumb }}" alt="Thumbnail {{ c.title }}" loading="lazy">
+          {% else %}
+            <img src="{{ url_for('static', filename=thumb) }}" alt="Thumbnail {{ c.title }}" loading="lazy">
+          {% endif %}
+        </div>
+      {% endif %}
+      <h3>{{ c.title }}{% if current_user.is_authenticated and is_student %} <span class="badge">{{ 'Diikuti' if c.id in enrolled_ids else 'Belum Daftar' }}</span>{% endif %}{% if c.is_premium %} <span class="badge">Premium</span>{% endif %}{% if c.material_type %} <span class="badge">{{ c.material_type }}</span>{% endif %}</h3>
+      <p>{{ c.description }}</p>
+      {% set lesson_titles = lesson_titles_map.get(c.id, []) %}
+      <details class="course-materials">
+        <summary>Materi</summary>
+        {% if lesson_titles %}
+          <ul class="course-materials-list">
+            {% for title in lesson_titles %}
+              <li>{{ title }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="course-materials-empty">Belum ada materi.</p>
+        {% endif %}
+      </details>
+      <div class="card-actions">
+                          <div class="card-actions-left">
+                            {% if not current_user.is_authenticated or is_student %}
+                              <div style="display: flex; gap: 12px; align-items: center;">
+                                {# Primary Action Button/Form #}
+                                {% if c.id in enrolled_ids %}
+                                  <a class="btn" href="{{ url_for('course_detail', course_id=c.id) }}">Lihat Materi</a>
+                                {% else %}
+                                  {% if c.is_premium %}
+                                    {% if c.id in cart_course_ids %}
+                                      <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
+                                    {% else %}
+                                      <form method="post" action="{{ url_for('add_to_cart', course_id=c.id, next='courses') }}">
+                                        <button class="btn" type="submit">Tambah Ke Keranjang</button>
+                                      </form>
+                                    {% endif %}
+                                  {% else %}
+                                    <form method="post" action="{{ url_for('enroll', course_id=c.id, next='courses') }}">
+                                      <button class="btn" type="submit">Daftar</button>
+                                    </form>
+                                  {% endif %}
+                                {% endif %}
+                  
+                                {# Secondary "Profile" Button #}
+                                              <a href="#" class="btn secondary open-instructor-modal-btn" 
+                                                      data-name="{{ c.instructor.name }}" 
+                                                      data-expertise="{{ c.instructor.expertise or '-' }}" 
+                                                      data-institution="{{ c.instructor.institution or '-' }}" 
+                                                      data-experience="{{ c.instructor.teaching_experience or '-' }}"
+                                                      data-certificate-data="{{ c.instructor.certificate_data or '' }}"
+                                                      data-certificate-type="{{ c.instructor.certificate_type or '' }}"
+                                                      data-course-title="{{ c.title }}">
+                                                Profil Pengajar
+                                              </a>                              </div>
+                            {% else %} {# Instructor View #}
+                              <a class="btn" href="{{ url_for('course_detail', course_id=c.id) }}">Lihat Materi</a>
+                            {% endif %}
+                          </div>        {% if current_user.is_authenticated and is_student and c.is_premium %}
+          <div class="card-actions-right">
+            <span class="course-price">Rp {{ '{:,.0f}'.format(c.price).replace(',', '.') if c.price else '0' }}</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <p>Tidak Ada Kursus Yang Tersedia</p>
+{% endif %}
+
+<div id="instructor-modal" class="instructor-modal" role="dialog" aria-modal="true" aria-labelledby="instructor-modal-title" hidden>
+  <div class="instructor-modal-content" tabindex="-1">
+    <div class="instructor-modal-header">
+      <h3 id="instructor-modal-title">Profil Pengajar</h3>
+      <button class="instructor-modal-close" id="close-instructor-modal-btn" type="button" aria-label="Tutup dialog">&times;</button>
+    </div>
+    <hr> {# Separator between header and body #}
+    <div class="instructor-modal-body">
+      <p><strong>Nama Kursus:</strong> <span id="modal-course-title"></span></p>
+      <p><strong>Nama:</strong> <span id="modal-instructor-name"></span></p>
+      <p><strong>Bidang Keahlian:</strong> <span id="modal-instructor-expertise"></span></p>
+      <p><strong>Institusi:</strong> <span id="modal-instructor-institution"></span></p>
+      <p><strong>Lama Mengajar:</strong> <span id="modal-instructor-experience"></span></p>
+      <p id="modal-certificate-section"><strong>Sertifikat:</strong> <span class="certificate-button-wrapper"><a id="modal-certificate-link" href="#" target="_blank" class="btn primary">Lihat Sertifikat</a></span></p>
+    </div>
+  </div>
+</div>
+<div id="instructor-modal-backdrop" class="instructor-modal-backdrop" hidden></div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('instructor-modal');
+    const backdrop = document.getElementById('instructor-modal-backdrop');
+    const closeBtn = document.getElementById('close-instructor-modal-btn');
+    const openBtns = document.querySelectorAll('.open-instructor-modal-btn');
+
+    const toggleFilterBtn = document.getElementById('toggle-filter-btn');
+    const filterSection = document.getElementById('filter-section');
+
+    if (toggleFilterBtn && filterSection) {
+      toggleFilterBtn.addEventListener('click', function() {
+        if (filterSection.style.display === 'none') {
+          filterSection.style.display = 'block';
+        } else {
+          filterSection.style.display = 'none';
+        }
+      });
+    }
+
+    const courseTitleEl = document.getElementById('modal-course-title');
+    const nameEl = document.getElementById('modal-instructor-name');
+    const expertiseEl = document.getElementById('modal-instructor-expertise');
+    const institutionEl = document.getElementById('modal-instructor-institution');
+    const experienceEl = document.getElementById('modal-instructor-experience');
+    const certificateSection = document.getElementById('modal-certificate-section');
+    const certificateLink = document.getElementById('modal-certificate-link');
+
+    function setTextOrPlaceholder(element, value) {
+      const trimmedValue = (value || '').trim();
+      element.textContent = trimmedValue && trimmedValue !== '-' ? trimmedValue : '-';
+    }
+
+    if (!modal || !backdrop || !closeBtn || !openBtns.length) {
+      return;
+    }
+
+    const modalContent = modal.querySelector('.instructor-modal-content');
+    let hideTimer = null;
+    let previouslyFocused = null;
+
+    function showModal() {
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      previouslyFocused = document.activeElement;
+      modal.hidden = false;
+      backdrop.hidden = false;
+      requestAnimationFrame(function() {
+        modal.classList.add('is-visible');
+        backdrop.classList.add('is-visible');
+        if (modalContent) {
+          modalContent.focus();
+        }
+      });
+    }
+
+    function hideModal() {
+      modal.classList.remove('is-visible');
+      backdrop.classList.remove('is-visible');
+      hideTimer = setTimeout(function() {
+        modal.hidden = true;
+        backdrop.hidden = true;
+        if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+          previouslyFocused.focus();
+        }
+      }, 200);
+    }
+
+    openBtns.forEach(function(btn) {
+      btn.addEventListener('click', function(event) {
+        event.preventDefault();
+        if (courseTitleEl) setTextOrPlaceholder(courseTitleEl, btn.dataset.courseTitle);
+        if (nameEl) setTextOrPlaceholder(nameEl, btn.dataset.name);
+        if (expertiseEl) setTextOrPlaceholder(expertiseEl, btn.dataset.expertise);
+        if (institutionEl) setTextOrPlaceholder(institutionEl, btn.dataset.institution);
+        const rawExperience = btn.dataset.experience || '';
+        const trimmedExperience = rawExperience.trim();
+        if (experienceEl) {
+          if (trimmedExperience && trimmedExperience !== '-') {
+            const normalizedExperience = trimmedExperience.toLowerCase();
+            experienceEl.textContent = normalizedExperience.includes('tahun') ? trimmedExperience : trimmedExperience + ' Tahun';
+          } else {
+            experienceEl.textContent = '-';
+          }
+        }
+
+        const certificateData = btn.dataset.certificateData;
+        const certificateType = btn.dataset.certificateType;
+
+        let hasCertificate = false;
+        if (certificateType && certificateType !== 'default' && certificateData) {
+          let certificateUrl = '';
+          if (certificateType === 'pdf' || certificateType === 'image') {
+            certificateUrl = `/static/${certificateData}`;
+          } else if (certificateType === 'link') {
+            certificateUrl = certificateData;
+          }
+          if (certificateUrl) {
+            certificateLink.href = certificateUrl;
+            certificateLink.setAttribute('aria-disabled', 'false');
+            certificateLink.classList.remove('is-disabled');
+            certificateLink.removeAttribute('tabindex');
+            hasCertificate = true;
+          }
+        }
+
+        if (!hasCertificate) {
+          certificateLink.href = '#';
+          certificateLink.setAttribute('aria-disabled', 'true');
+          certificateLink.classList.add('is-disabled');
+          certificateLink.setAttribute('tabindex', '-1');
+        }
+
+        showModal();
+      });
+    });
+
+    closeBtn.addEventListener('click', function() {
+      hideModal();
+    });
+
+    backdrop.addEventListener('click', hideModal);
+
+    modal.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        hideModal();
+      }
+    });
+  });
+</script>
+
+{% endblock %}
+
+
+
+
+

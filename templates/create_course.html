@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block content %}
+{% set is_edit = course is defined and course %}
+{% set formatted_price = ('{:,.0f}'.format(course.price).replace(',', '.')) if is_edit and course.price else '' %}
+{% set existing_thumb = course.thumbnail_path if is_edit and course and course.thumbnail_path else '' %}
+{% set existing_thumb_url = existing_thumb if existing_thumb and existing_thumb.startswith('http') else '' %}
+{% set existing_thumb_local = existing_thumb if existing_thumb and not existing_thumb.startswith('http') else '' %}
+{% set selected_thumb_mode = 'url' if existing_thumb_url else 'file' %}
+<h2>{{ 'Edit Kursus' if is_edit else 'Buat Kursus' }}</h2>
+{% set back_url = url_for('instructor_dashboard') %}
+<form method="post" id="course-form" class="course-form" enctype="multipart/form-data">
+  <div class="course-field">
+    <label>Thumbnail</label>
+    <div class="thumbnail-mode">
+      <label class="thumbnail-option{% if selected_thumb_mode != 'url' %} is-active{% endif %}">
+        <input type="radio" name="thumbnail_mode" value="file" {% if selected_thumb_mode != 'url' %}checked{% endif %}>
+        <span>Upload menggunakan file gambar</span>
+      </label>
+      <label class="thumbnail-option{% if selected_thumb_mode == 'url' %} is-active{% endif %}">
+        <input type="radio" name="thumbnail_mode" value="url" {% if selected_thumb_mode == 'url' %}checked{% endif %}>
+        <span>Upload menggunakan link</span>
+      </label>
+    </div>
+  </div>
+
+  <div id="thumbnail-file-section" class="thumbnail-section{% if selected_thumb_mode != 'url' %} is-visible{% endif %}">
+    <div class="thumbnail-file-control">
+      <input type="file" name="thumbnail_file" id="thumbnail_file" accept="image/*" class="thumbnail-file-input">
+      <label class="thumbnail-file-box" for="thumbnail_file">
+        <span class="thumbnail-file-icon" aria-hidden="true">+</span>
+        <span class="thumbnail-file-text">Klik untuk pilih gambar<br><small>Format PNG, JPG, JPEG, GIF, atau WEBP</small></span>
+      </label>
+      <span id="thumbnail-file-name" class="thumbnail-file-name">Tidak ada file dipilih</span>
+    </div>
+    <small class="thumbnail-hint">Unggah file gambar untuk thumbnail course. Jika mengunggah gambar baru, thumbnail sebelumnya akan diganti.</small>
+    {% if existing_thumb_local %}
+      <div class="thumbnail-preview">
+        <img src="{{ url_for('static', filename=existing_thumb_local) }}" alt="Thumbnail saat ini" loading="lazy">
+        <span class="thumbnail-preview-note">Thumbnail saat ini. Mengunggah file baru atau beralih ke link akan menggantikan gambar ini.</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <div id="thumbnail-url-section" class="thumbnail-section{% if selected_thumb_mode == 'url' %} is-visible{% endif %}">
+    <div class="course-field thumbnail-url-field">
+      <label for="thumbnail_url">Link Thumbnail</label>
+      <input type="url" name="thumbnail_url" id="thumbnail_url" placeholder="https://contoh.com/gambar.jpg" value="{{ existing_thumb_url }}">
+    </div>
+    <small class="thumbnail-hint">Gunakan tautan langsung (http/https) ke gambar yang dapat diakses publik.</small>
+    {% if existing_thumb_url %}
+      <div class="thumbnail-preview">
+        <img src="{{ existing_thumb_url }}" alt="Thumbnail saat ini" loading="lazy">
+        <span class="thumbnail-preview-note">Thumbnail saat ini diambil dari tautan.</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="course-field">
+    <label for="title">Title</label>
+    <input id="title" name="title" value="{{ course.title if is_edit else '' }}" required>
+  </div>
+  <div class="course-field">
+    <label for="description">Description</label>
+    <textarea id="description" name="description" rows="6">{{ course.description if course else '' }}</textarea>
+  </div>
+  <div class="course-field">
+    <label for="material_type">Jenis Materi</label>
+    <select id="material_type" name="material_type">
+      <option value="" {% if not course or not course.material_type %}selected{% endif %}>-- Pilih Jenis Materi --</option>
+      <option value="Microsoft Office 2021" {% if course and course.material_type == 'Microsoft Office 2021' %}selected{% endif %}>Microsoft Office 2021</option>
+      <option value="Microsoft Word" {% if course and course.material_type == 'Microsoft Word' %}selected{% endif %}>Microsoft Word</option>
+      <option value="Microsoft Excel" {% if course and course.material_type == 'Microsoft Excel' %}selected{% endif %}>Microsoft Excel</option>
+      <option value="Microsoft PowerPoint" {% if course and course.material_type == 'Microsoft PowerPoint' %}selected{% endif %}>Microsoft PowerPoint</option>
+    </select>
+  </div>
+
+
+
+  <div class="course-field">
+    <div class="course-field">
+      <label for="is-premium-select">Premium?</label>
+      <select name="is_premium" id="is-premium-select">
+        <option value="no" {% if is_edit and not course.is_premium %}selected{% endif %}>No (free)</option>
+        <option value="yes" {% if is_edit and course.is_premium %}selected{% endif %}>Yes (premium)</option>
+      </select>
+    </div>
+    <div class="course-field price-field" id="price-field" style="display:none;">
+      <label for="price-input">Harga Kursus</label>
+      <div class="price-input">
+        <span class="currency-prefix">Rp</span>
+        <input type="text" name="price" id="price-input" value="{{ formatted_price }}" inputmode="numeric" pattern="[0-9.]*" placeholder="0">
+      </div>
+      <small class="price-hint">Masukkan angka saja, contoh: 150000 (otomatis diformat menjadi Rp 150.000).</small>
+    </div>
+  </div>
+  <div class="course-field">
+    <div class="button-group">
+      <button class="btn primary" type="submit">Simpan</button>
+      <a class="btn secondary" href="{{ back_url }}">Batal</a>
+    </div>
+  </div>
+</form>
+<script>
+(function(){
+  const selectEl = document.getElementById('is-premium-select');
+  const priceField = document.getElementById('price-field');
+  const priceInput = document.getElementById('price-input');
+  const modeInputs = document.querySelectorAll('input[name="thumbnail_mode"]');
+  const fileSection = document.getElementById('thumbnail-file-section');
+  const urlSection = document.getElementById('thumbnail-url-section');
+  const fileInput = document.getElementById('thumbnail_file');
+  const fileNameLabel = document.getElementById('thumbnail-file-name');
+  const urlInput = document.getElementById('thumbnail_url');
+
+  if (selectEl && priceField && priceInput){
+    const FORMATTER = new Intl.NumberFormat('id-ID');
+
+    function formatNumber(value){
+      const digits = value.replace(/\D+/g, '');
+      if (!digits) return '';
+      return FORMATTER.format(parseInt(digits, 10));
+    }
+
+    function togglePrice(){
+      const isPremium = selectEl.value === 'yes';
+      priceField.style.display = isPremium ? 'block' : 'none';
+      priceInput.disabled = !isPremium;
+      priceInput.required = isPremium;
+      if (!isPremium){
+        priceInput.value = '';
+      }
+    }
+
+    priceInput.addEventListener('input', function(){
+      const formatted = formatNumber(this.value);
+      this.value = formatted;
+    });
+
+    selectEl.addEventListener('change', togglePrice);
+    togglePrice();
+  }
+
+  function updateModeClasses(){
+    modeInputs.forEach(function(input){
+      const label = input.closest('.thumbnail-option');
+      if (label){
+        label.classList.toggle('is-active', input.checked);
+      }
+    });
+  }
+
+  function applyThumbnailMode(mode){
+    if (fileSection){
+      fileSection.classList.toggle('is-visible', mode === 'file');
+    }
+    if (urlSection){
+      urlSection.classList.toggle('is-visible', mode === 'url');
+    }
+    updateModeClasses();
+  }
+
+  let cachedUrlValue = urlInput ? urlInput.value : '';
+  const defaultFileLabel = fileNameLabel ? fileNameLabel.textContent : '';
+
+  function handleModeChange(event){
+    const mode = event.target.value;
+    if (mode === 'file' && urlInput){
+      cachedUrlValue = urlInput.value;
+      urlInput.value = '';
+    } else if (mode === 'url' && urlInput){
+      urlInput.value = cachedUrlValue;
+    }
+    if (mode === 'url' && fileInput){
+      fileInput.value = '';
+      if (fileNameLabel){
+        fileNameLabel.textContent = defaultFileLabel;
+      }
+    }
+    applyThumbnailMode(mode);
+  }
+
+  modeInputs.forEach(function(input){
+    input.addEventListener('change', handleModeChange);
+  });
+
+  if (fileInput && fileNameLabel){
+    fileInput.addEventListener('change', function(){
+      if (fileInput.files && fileInput.files[0]){
+        fileNameLabel.textContent = fileInput.files[0].name;
+      } else {
+        fileNameLabel.textContent = defaultFileLabel;
+      }
+    });
+  }
+
+  const initiallyChecked = document.querySelector('input[name="thumbnail_mode"]:checked');
+  applyThumbnailMode(initiallyChecked ? initiallyChecked.value : 'file');
+})();
+</script>
+{% endblock %}

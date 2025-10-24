@@ -1,0 +1,239 @@
+﻿{% extends "base.html" %}
+{% block content %}
+<h2>Kursus Saya</h2>
+
+<div style="margin-bottom: 1rem;">
+  <button id="toggle-filter-btn" class="btn">Filter</button>
+</div>
+
+<div id="filter-section" style="display: none;">
+  <form method="get" action="{{ url_for('my_courses') }}">
+    <div style="margin-bottom: 1rem;">
+      <div style="margin-bottom: 0.5rem;">
+        <select name="material_type">
+          <option value="">Semua Jenis Materi</option>
+          <option value="Microsoft Office 2021" {% if selected_material_type == 'Microsoft Office 2021' %}selected{% endif %}>Microsoft Office 2021</option>
+          <option value="Microsoft Word" {% if selected_material_type == 'Microsoft Word' %}selected{% endif %}>Microsoft Word</option>
+          <option value="Microsoft Excel" {% if selected_material_type == 'Microsoft Excel' %}selected{% endif %}>Microsoft Excel</option>
+          <option value="Microsoft PowerPoint" {% if selected_material_type == 'Microsoft PowerPoint' %}selected{% endif %}>Microsoft PowerPoint</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <select name="is_premium">
+          <option value="">Semua Jenis Kursus</option>
+          <option value="yes" {% if selected_is_premium == 'yes' %}selected{% endif %}>Premium</option>
+          <option value="no" {% if selected_is_premium == 'no' %}selected{% endif %}>Gratis</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <input type="search" name="search" placeholder="Cari judul kursus..." value="{{ search_query or '' }}">
+      </div>
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="submit" class="btn primary">Simpan</button>
+        <a href="{{ url_for('my_courses') }}" class="btn secondary">Reset Filter</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if courses %}
+  {% for course in courses %}
+    {% set progress = progress_map.get(course.id, {'completed': 0, 'total': 0, 'percent': 0}) %}
+    {% set unlocked = enrollment_status.get(course.id, False) %}
+    <div class="card course-card">
+      {% set thumb = course.thumbnail_path %}
+      {% if thumb %}
+        <div class="course-card-thumb">
+          {% if thumb.startswith('http') %}
+            <img src="{{ thumb }}" alt="Thumbnail {{ course.title }}" loading="lazy">
+          {% else %}
+            <img src="{{ url_for('static', filename=thumb) }}" alt="Thumbnail {{ course.title }}" loading="lazy">
+          {% endif %}
+        </div>
+      {% endif %}
+      <h3>{{ course.title }}{% if course.is_premium %} <span class="badge">Premium</span>{% endif %}</h3>
+      <p>{{ course.description or 'Belum ada deskripsi.' }}</p>
+      {% if progress.total %}
+        <p class="course-progress">Progress: {{ progress.completed }}/{{ progress.total }} pelajaran ({{ progress.percent }}%)</p>
+      {% else %}
+        <p class="course-progress">Belum ada materi pada kursus ini.</p>
+      {% endif %}
+      {% if course.is_premium and not unlocked %}
+        <p class="course-locked">Status: kursus premium belum terbuka sepenuhnya.</p>
+      {% endif %}
+      <div class="card-actions">
+        <a class="btn" href="{{ url_for('course_detail', course_id=course.id) }}">Materi</a><a href="#" class="btn secondary open-instructor-modal-btn" 
+            data-name="{{ course.instructor.name }}" 
+            data-expertise="{{ course.instructor.expertise or '-' }}" 
+            data-institution="{{ course.instructor.institution or '-' }}" 
+            data-experience="{{ course.instructor.teaching_experience or '-' }}"
+            data-certificate-data="{{ course.instructor.certificate_data or '' }}"
+            data-certificate-type="{{ course.instructor.certificate_type or '' }}"
+            data-course-title="{{ course.title }}">
+          Profil Pengajar
+        </a>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="card">
+    <p>Tidak ada kursus yang tersedia.</p>
+    <a class="btn" href="{{ url_for('courses') }}">Cari Kursus</a>
+  </div>
+{% endif %}
+<div id="instructor-modal" class="instructor-modal" role="dialog" aria-modal="true" aria-labelledby="instructor-modal-title" hidden>
+  <div class="instructor-modal-content" tabindex="-1">
+    <div class="instructor-modal-header">
+      <h3 id="instructor-modal-title">Profil Pengajar</h3>
+      <button class="instructor-modal-close" id="close-instructor-modal-btn" type="button" aria-label="Tutup dialog">&times;</button>
+    </div>
+    <hr> {# Separator between header and body #}
+    <div class="instructor-modal-body">
+      <p><strong>Nama Kursus:</strong> <span id="modal-course-title"></span></p>
+      <p><strong>Nama:</strong> <span id="modal-instructor-name"></span></p>
+      <p><strong>Bidang Keahlian:</strong> <span id="modal-instructor-expertise"></span></p>
+      <p><strong>Institusi:</strong> <span id="modal-instructor-institution"></span></p>
+      <p><strong>Lama Mengajar:</strong> <span id="modal-instructor-experience"></span></p>
+      <p id="modal-certificate-section"><strong>Sertifikat:</strong> <span class="certificate-button-wrapper"><a id="modal-certificate-link" href="#" target="_blank" class="btn primary">Lihat Sertifikat</a></span></p>
+    </div>
+  </div>
+</div>
+<div id="instructor-modal-backdrop" class="instructor-modal-backdrop" hidden></div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('instructor-modal');
+    const backdrop = document.getElementById('instructor-modal-backdrop');
+    const closeBtn = document.getElementById('close-instructor-modal-btn');
+    const openBtns = document.querySelectorAll('.open-instructor-modal-btn');
+
+    const toggleFilterBtn = document.getElementById('toggle-filter-btn');
+    const filterSection = document.getElementById('filter-section');
+
+    if (toggleFilterBtn && filterSection) {
+      toggleFilterBtn.addEventListener('click', function() {
+        if (filterSection.style.display === 'none') {
+          filterSection.style.display = 'block';
+        } else {
+          filterSection.style.display = 'none';
+        }
+      });
+    }
+
+    const courseTitleEl = document.getElementById('modal-course-title');
+    const nameEl = document.getElementById('modal-instructor-name');
+    const expertiseEl = document.getElementById('modal-instructor-expertise');
+    const institutionEl = document.getElementById('modal-instructor-institution');
+    const experienceEl = document.getElementById('modal-instructor-experience');
+    const certificateSection = document.getElementById('modal-certificate-section');
+    const certificateLink = document.getElementById('modal-certificate-link');
+
+    function setTextOrPlaceholder(element, value) {
+      const trimmedValue = (value || '').trim();
+      element.textContent = trimmedValue && trimmedValue !== '-' ? trimmedValue : '-';
+    }
+
+    if (!modal || !backdrop || !closeBtn || !openBtns.length) {
+      return;
+    }
+
+    const modalContent = modal.querySelector('.instructor-modal-content');
+    let hideTimer = null;
+    let previouslyFocused = null;
+
+    function showModal() {
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      previouslyFocused = document.activeElement;
+      modal.hidden = false;
+      backdrop.hidden = false;
+      requestAnimationFrame(function() {
+        modal.classList.add('is-visible');
+        backdrop.classList.add('is-visible');
+        if (modalContent) {
+          modalContent.focus();
+        }
+      });
+    }
+
+    function hideModal() {
+      modal.classList.remove('is-visible');
+      backdrop.classList.remove('is-visible');
+      hideTimer = setTimeout(function() {
+        modal.hidden = true;
+        backdrop.hidden = true;
+        if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+          previouslyFocused.focus();
+        }
+      }, 200);
+    }
+
+    openBtns.forEach(function(btn) {
+      btn.addEventListener('click', function(event) {
+        event.preventDefault();
+        if (courseTitleEl) setTextOrPlaceholder(courseTitleEl, btn.dataset.courseTitle);
+        if (nameEl) setTextOrPlaceholder(nameEl, btn.dataset.name);
+        if (expertiseEl) setTextOrPlaceholder(expertiseEl, btn.dataset.expertise);
+        if (institutionEl) setTextOrPlaceholder(institutionEl, btn.dataset.institution);
+        const rawExperience = btn.dataset.experience || '';
+        const trimmedExperience = rawExperience.trim();
+        if (experienceEl) {
+          if (trimmedExperience && trimmedExperience !== '-') {
+            const normalizedExperience = trimmedExperience.toLowerCase();
+            experienceEl.textContent = normalizedExperience.includes('tahun') ? trimmedExperience : trimmedExperience + ' Tahun';
+          } else {
+            experienceEl.textContent = '-';
+          }
+        }
+
+        const certificateData = btn.dataset.certificateData;
+        const certificateType = btn.dataset.certificateType;
+
+        let hasCertificate = false;
+        if (certificateType && certificateType !== 'default' && certificateData) {
+          let certificateUrl = '';
+          if (certificateType === 'pdf' || certificateType === 'image') {
+            certificateUrl = `/static/${certificateData}`;
+          } else if (certificateType === 'link') {
+            certificateUrl = certificateData;
+          }
+          if (certificateUrl) {
+            certificateLink.href = certificateUrl;
+            certificateLink.setAttribute('aria-disabled', 'false');
+            certificateLink.classList.remove('is-disabled');
+            certificateLink.removeAttribute('tabindex');
+            hasCertificate = true;
+          }
+        }
+
+        if (!hasCertificate) {
+          certificateLink.href = '#';
+          certificateLink.setAttribute('aria-disabled', 'true');
+          certificateLink.classList.add('is-disabled');
+          certificateLink.setAttribute('tabindex', '-1');
+        }
+
+        showModal();
+      });
+    });
+
+    closeBtn.addEventListener('click', function() {
+      hideModal();
+    });
+
+    backdrop.addEventListener('click', hideModal);
+
+    modal.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        hideModal();
+      }
+    });
+  });
+</script>
+
+{% endblock %}
+
+
+

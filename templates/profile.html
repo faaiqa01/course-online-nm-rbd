@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+{% if show_verification_warning %}
+  <div class="alert error">Anda harus melengkapi profil dan mengunggah sertifikat untuk mengakses halaman lain.</div>
+{% endif %}
+<h2>Profil Pengguna</h2>
+{% if current_user.role == 'instructor' %}
+<div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+    <label style="font-weight: 600; color: #111827; margin: 0;">Status Verifikasi</label>
+    {% if current_user.is_verified %}
+        <span class="badge" style="background-color: #4CAF50; color: white;">Terverifikasi</span>
+    {% else %}
+        <span class="badge" style="background-color: #f44336; color: white;">Belum Terverifikasi</span>
+    {% endif %}
+</div>
+{% endif %}
+<form method="post" class="course-form" enctype="multipart/form-data">
+  <div class="course-field">
+    <label for="name">Nama</label>
+    <input type="text" id="name" name="name" value="{{ current_user.name }}" required>
+  </div>
+  <div class="course-field">
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" value="{{ current_user.email }}" required>
+  </div>
+
+  {% if current_user.role == 'instructor' %}
+  <div class="course-field">
+    <label for="expertise">Bidang Keahlian</label>
+    <select id="expertise" name="expertise">
+      <option value="" {% if not current_user.expertise %}selected{% endif %}>-- Pilih Bidang --</option>
+      <option value="Microsoft Word" {% if current_user.expertise == 'Microsoft Word' %}selected{% endif %}>Microsoft Word</option>
+      <option value="Microsoft Excel" {% if current_user.expertise == 'Microsoft Excel' %}selected{% endif %}>Microsoft Excel</option>
+      <option value="Microsoft PowerPoint" {% if current_user.expertise == 'Microsoft PowerPoint' %}selected{% endif %}>Microsoft PowerPoint</option>
+    </select>
+  </div>
+  <div class="course-field">
+      <label for="institution">Asal Lembaga</label>
+      <input type="text" id="institution" name="institution" value="{{ current_user.institution or '' }}">
+  </div>
+      <div class="course-field">
+          <label for="teaching_experience">Lama Mengajar (tahun)</label>
+          <input type="number" id="teaching_experience" name="teaching_experience" value="{{ current_user.teaching_experience or '' }}">
+      </div>
+    
+        <div id="certificate_management_section">      {% if current_user.certificate_data and current_user.certificate_type != 'default' %}
+        <div class="course-field">
+          <label>Sertifikat Anda</label>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <a href="{{ url_for('static', filename=current_user.certificate_data) if current_user.certificate_type in ['pdf', 'image'] else current_user.certificate_data }}" target="_blank" class="btn secondary">Lihat Sertifikat</a>
+            <form method="post" action="{{ url_for('delete_instructor_certificate') }}" style="margin: 0;">
+              <button type="submit" class="btn danger">Hapus Sertifikat</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <div class="course-field">
+          <label for="certificate_type">Tipe Sertifikat</label>
+          <select id="certificate_type" name="certificate_type">
+            <option value="default" {% if current_user.certificate_type == 'default' %}selected{% endif %}>Pilih Tipe Sertifikat</option>
+            <option value="pdf" {% if current_user.certificate_type == 'pdf' %}selected{% endif %}>PDF</option>
+            <option value="image" {% if current_user.certificate_type == 'image' %}selected{% endif %}>Gambar</option>
+            <option value="link" {% if current_user.certificate_type == 'link' %}selected{% endif %}>Link Eksternal</option>
+          </select>
+        </div>
+  
+        <div class="course-field" id="certificate_file_upload_field" style="display: none;">
+          <label for="certificate_file">Upload Sertifikat (PDF/Gambar)</label>
+          <input type="file" id="certificate_file" name="certificate_file" accept=".pdf,.png,.jpg,.jpeg">
+        </div>
+  
+        <div class="course-field" id="certificate_link_field" style="display: none;">
+          <label for="certificate_link">Link Sertifikat Eksternal</label>
+          <input type="url" id="certificate_link" name="certificate_link" value="{{ current_user.certificate_data if current_user.certificate_type == 'link' else '' }}">
+        </div>
+  
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            const certificateTypeSelect = document.getElementById('certificate_type');
+            const certificateFileUploadField = document.getElementById('certificate_file_upload_field');
+            const certificateLinkField = document.getElementById('certificate_link_field');
+  
+            function toggleCertificateFields() {
+              const selectedType = certificateTypeSelect.value;
+              certificateFileUploadField.style.display = 'none';
+              certificateLinkField.style.display = 'none';
+  
+              if (selectedType === 'pdf' || selectedType === 'image') {
+                certificateFileUploadField.style.display = 'block';
+              } else if (selectedType === 'link') {
+                certificateLinkField.style.display = 'block';
+              }
+            }
+  
+            certificateTypeSelect.addEventListener('change', toggleCertificateFields);
+            toggleCertificateFields(); // Call on load to set initial state
+          });
+        </script>
+      {% endif %}
+    </div>  {% endif %}
+
+  <div class="button-group" style="margin-top: 25px;">
+    <button type="submit" class="btn primary">Simpan</button>
+    <a class="btn secondary" href="{{ url_for('index') }}">Batal</a>
+  </div>
+</form>
+{% endblock %}

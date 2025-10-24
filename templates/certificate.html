@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Certificate of Completion</h2>
+<div class="card-actions">
+  <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Back</a>
+</div>
+<p>This certifies that <strong>{{ user.name }}</strong> has successfully completed the course <strong>{{ course.title }}</strong> with a passing score.</p>
+<p>Date: {{ date }}</p>
+<hr>
+<p><em>Tip:</em> Use your browser <strong>Print -> Save as PDF</strong> to download this certificate.</p>
+{% endblock %}
+

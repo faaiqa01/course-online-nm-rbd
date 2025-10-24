@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+{% set is_edit = question is defined and question %}
+<h2>{{ 'Edit Quiz Question' if is_edit else 'Add Quiz Question' }} - {{ course.title }}</h2>
+<div class="card-actions">
+  <a class="btn secondary" href="{{ url_for('manage_quiz', course_id=course.id) }}">Back</a>
+</div>
+<form method="post" class="question-form">
+  <div class="card question-editor-card">
+    <label class="question-editor-label">Question Text</label>
+    <textarea class="question-editor-text" name="qtext" rows="3" required>{{ question.text if is_edit else '' }}</textarea>
+  </div>
+  <div class="card question-editor-card">
+    <div class="question-editor-label">Choices</div>
+    <div class="question-editor-options">
+      {% set selected_correct = current_correct if current_correct is defined else '1' %}
+      {% for choice in choices %}
+        <label class="question-editor-option">
+          <input type="hidden" name="choice_id{{ choice.index }}" value="{{ choice.id }}">
+          <input type="radio" name="correct_idx" value="{{ choice.index }}" {% if selected_correct == choice.index|string %}checked{% endif %}>
+          <span class="question-editor-option-content">
+            <span class="quiz-option-index">{{ loop.index }}</span>
+            <input class="question-editor-input" name="choice{{ choice.index }}" placeholder="Choice {{ choice.index }}" value="{{ choice.text }}">
+            <span class="question-editor-correct">Correct</span>
+          </span>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card-actions question-editor-actions">
+    <button class="btn" type="submit">{{ 'Update Question' if is_edit else 'Add Question' }}</button>
+  </div>
+</form>
+{% endblock %}
+

@@ -1,0 +1,35 @@
+# Lingkungan virtual
+venv/
+.venv/
+env/
+.env
+
+# File cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# File spesifik IDE
+.idea/
+.vscode/
+
+# File upload (seperti thumbnail)
+static/uploads/
+
+# File executable
+ngrok.exe
+
+# File log dan database sementara
+*.log
+*.db
+*.sqlite3
+
+# File-file lain yang tidak perlu dilacak
+DB_SYNC_INSTRUCTIONS.txt
+fix_thumbnail_column.txt
+test.txt
+*.docx
+
+/laporan
+/lain

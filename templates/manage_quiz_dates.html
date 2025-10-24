@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Atur Tanggal Kuis - {{ course.title }}</h2>
+<form method="post" class="course-form">
+  <div class="course-field">
+    <label for="quiz_start_date">Quiz Tanggal Mulai</label>
+    <input type="datetime-local" id="quiz_start_date" name="quiz_start_date" value="{{ course.quiz_start_date.strftime('%Y-%m-%dT%H:%M') if course and course.quiz_start_date else '' }}">
+  </div>
+  <div class="course-field">
+    <label for="quiz_end_date">Quiz Tanggal Selesai</label>
+    <input type="datetime-local" id="quiz_end_date" name="quiz_end_date" value="{{ course.quiz_end_date.strftime('%Y-%m-%dT%H:%M') if course and course.quiz_end_date else '' }}">
+  </div>
+  <div class="card-actions">
+    <button class="btn primary" type="submit">Simpan Tanggal Kuis</button>
+    <a class="btn secondary" href="{{ url_for('manage_quiz', course_id=course.id) }}">Batal</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "Online Course" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="nav">
+    <a href="{{ url_for('index') }}"><strong>TechNova Academy</strong></a>
+    {% if not current_user.is_authenticated or current_user.role == 'student' or current_user.is_verified %}
+    <a href="{{ url_for('index') }}">Dashboard</a>
+    <a href="{{ url_for('courses') }}">Lihat Kursus</a>
+    {% endif %}
+    {% if current_user.is_authenticated and current_user.role == 'student' %}
+      <a href="{{ url_for('my_courses') }}">Kursus Saya</a>
+      <a href="{{ url_for('cart') }}">Keranjang</a>
+    {% endif %}
+    {% if current_user.is_authenticated %}
+      {% if current_user.role == 'instructor' and current_user.is_verified %}<a href="{{ url_for('instructor_dashboard') }}">Instructor</a>{% endif %}
+      <div class="dropdown" style="margin-left:auto;">
+        <button class="dropdown-toggle">Hi, {{ current_user.name }} ({{ current_user.role }})</button>
+        <div class="dropdown-menu">
+          <a href="{{ url_for('profile') }}">Profile</a>
+          <a href="{{ url_for('logout') }}">Logout</a>
+        </div>
+      </div>
+    {% else %}
+      <span style="margin-left:auto;"></span>
+      <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('register') }}" style="margin-left:12px;">Register</a>
+    {% endif %}
+  </div>
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert {{ 'success' if category=='success' else 'error' if category=='error' else '' }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var dropdownToggle = document.querySelector('.dropdown-toggle');
+    if (dropdownToggle) {
+        dropdownToggle.addEventListener('click', function(event) {
+            event.stopPropagation();
+            var dropdownMenu = this.nextElementSibling;
+            dropdownMenu.classList.toggle('show');
+        });
+    }
+
+    window.addEventListener('click', function(event) {
+        var dropdowns = document.getElementsByClassName("dropdown-menu");
+        for (var i = 0; i < dropdowns.length; i++) {
+            var openDropdown = dropdowns[i];
+            if (openDropdown.classList.contains('show')) {
+                openDropdown.classList.remove('show');
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
+

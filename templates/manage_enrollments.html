@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="manage-enrollments">
+    <div class="card manage-enrollments-card">
+        <div class="manage-enrollments-header">
+            <h2>Kelola Siswa untuk Kursus: {{ course.title }}</h2>
+        </div>
+
+        {% if enrolled_students %}
+        <div class="manage-enrollments-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama Siswa</th>
+                        <th>Email Siswa</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in enrolled_students %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ student.name }}</td>
+                        <td>{{ student.email }}</td>
+                        <td class="manage-enrollments-actions">
+                            <a href="{{ url_for('student_detail_for_instructor', course_id=course.id, user_id=student.id) }}" class="btn small">Lihat</a>
+                            <form action="{{ url_for('unenroll_student', course_id=course.id, user_id=student.id) }}" method="POST">
+                                <button type="submit" class="btn danger small" onclick="return confirm('Apakah Anda yakin ingin menghapus siswa ini dari kursus?');">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="manage-enrollments-empty">Belum ada siswa yang terdaftar di kursus ini.</p>
+        {% endif %}
+
+        <div class="manage-enrollments-footer">
+            <a href="{{ url_for('instructor_dashboard') }}" class="btn secondary">Kembali</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

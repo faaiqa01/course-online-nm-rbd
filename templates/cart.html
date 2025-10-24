@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Keranjang Saya</h2>
+{% if items %}
+  <div class="cart-layout">
+    <div class="cart-table">
+      <div class="cart-row cart-row-head">
+        <span class="cart-remove-head"></span>
+        <span class="cart-column-title">Product</span>
+        <span class="cart-column-title">Price</span>
+        <span class="cart-column-title">Subtotal</span>
+      </div>
+      {% for entry in items %}
+        {% set course = entry.course %}
+        {% set formatted_price = 'Rp {:,.0f}'.format(course.price or 0).replace(',', '.') %}
+        <div class="cart-row">
+          <div class="cart-remove">
+            <form method="post" action="{{ url_for('remove_from_cart', course_id=course.id, next='cart') }}" aria-label="Hapus {{ course.title }} dari keranjang">
+              <button class="cart-remove-btn" type="submit" title="Hapus dari keranjang">&times;</button>
+            </form>
+          </div>
+          <div class="cart-product">
+            {% set thumb = course.thumbnail_path %}
+            <div class="cart-product-thumb">
+              {% if thumb %}
+                {% if thumb.startswith('http') %}
+                  <img src="{{ thumb }}" alt="Thumbnail {{ course.title }}" loading="lazy">
+                {% else %}
+                  <img src="{{ url_for('static', filename=thumb) }}" alt="Thumbnail {{ course.title }}" loading="lazy">
+                {% endif %}
+              {% else %}
+                <span aria-hidden="true">{{ course.title[:1]|upper }}</span>
+              {% endif %}
+            </div>
+            <div class="cart-product-info">
+              <div class="cart-product-title">{{ course.title }}</div>
+              <div class="cart-product-desc">{{ course.description or 'Belum ada deskripsi.' }}</div>
+            </div>
+          </div>
+          <div class="cart-price">{{ formatted_price }}</div>
+          <div class="cart-subtotal">{{ formatted_price }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="cart-summary">
+      <div class="cart-summary-row">
+        <span>Subtotal</span>
+        <span>{{ 'Rp {:,.0f}'.format(subtotal).replace(',', '.') }}</span>
+      </div>
+      <div class="cart-summary-row cart-summary-total">
+        <span>Total</span>
+        <span id="cart-total-display">{{ 'Rp {:,.0f}'.format(total).replace(',', '.') }}</span>
+      </div>
+      <button class="checkout-btn" type="button" id="checkout-trigger">Proceed to checkout</button>
+    </div>
+  </div>
+
+  <div class="payment-modal-backdrop" id="payment-backdrop" hidden></div>
+  <section class="payment-modal" id="payment-modal" hidden role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+    <div class="payment-modal-content" tabindex="-1">
+      <header class="payment-modal-header">
+        <h3 id="payment-modal-title">Pilih Pembayaran</h3>
+        <button type="button" class="payment-modal-close" id="payment-close" aria-label="Tutup dialog">&times;</button>
+      </header>
+      <form class="payment-modal-body" id="payment-form">
+        <label class="payment-option">
+          <input type="radio" name="payment_method" value="saldo" checked>
+          <span>Saldo Saya</span>
+        </label>
+      </form>
+      <footer class="payment-modal-footer">
+        <button type="button" class="btn secondary" id="payment-cancel">Batal</button>
+        <button type="button" class="btn primary" id="payment-confirm">Lanjutkan</button>
+      </footer>
+    </div>
+  </section>
+
+  <section class="payment-modal" id="summary-modal" hidden role="dialog" aria-modal="true" aria-labelledby="summary-modal-title">
+    <div class="payment-modal-content" tabindex="-1">
+      <header class="payment-modal-header">
+        <h3 id="summary-modal-title">Konfirmasi Pembayaran</h3>
+        <button type="button" class="payment-modal-close" id="summary-close" aria-label="Tutup dialog">&times;</button>
+      </header>
+      <div class="payment-modal-body" id="summary-body">
+        <p class="summary-text">Anda akan membayar sebesar <strong id="summary-total"></strong> menggunakan <strong id="summary-method"></strong>. Apakah anda yakin?</p>
+      </div>
+      <footer class="payment-modal-footer">
+        <button type="button" class="btn secondary" id="summary-cancel">Batal</button>
+        <button type="button" class="btn primary" id="summary-confirm">Bayar</button>
+      </footer>
+    </div>
+  </section>
+
+    <script>
+  (function(){
+    const PROCESS_DURATION_MS = 15000;
+    const SUCCESS_COUNTDOWN_SECONDS = 3;
+    const checkoutUrl = "{{ url_for('checkout_cart') }}";
+
+    const trigger = document.getElementById('checkout-trigger');
+    const paymentModal = document.getElementById('payment-modal');
+    const summaryModal = document.getElementById('summary-modal');
+    const backdrop = document.getElementById('payment-backdrop');
+    const closeBtn = document.getElementById('payment-close');
+    const cancelBtn = document.getElementById('payment-cancel');
+    const confirmBtn = document.getElementById('payment-confirm');
+    const summaryClose = document.getElementById('summary-close');
+    const summaryCancel = document.getElementById('summary-cancel');
+    const summaryConfirm = document.getElementById('summary-confirm');
+    const totalDisplay = document.getElementById('cart-total-display');
+    const paymentForm = document.getElementById('payment-form');
+    const summaryBody = document.getElementById('summary-body');
+    const summaryTitle = document.getElementById('summary-modal-title');
+
+    if (!trigger || !paymentModal || !backdrop || !summaryModal || !summaryBody || !summaryTitle) {
+      return;
+    }
+
+    const confirmTemplate = summaryBody.innerHTML;
+    const confirmButtonLabel = summaryConfirm.textContent;
+    const cancelButtonLabel = summaryCancel.textContent;
+
+    let summaryTotalEl = document.getElementById('summary-total');
+    let summaryMethodEl = document.getElementById('summary-method');
+
+    let isProcessing = false;
+    let processTimer = null;
+    let countdownTimer = null;
+    let lastTotalText = '';
+    let lastMethodText = '';
+
+    function resetTimers(){
+      if (processTimer){
+        clearTimeout(processTimer);
+        processTimer = null;
+      }
+      if (countdownTimer){
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+      }
+    }
+
+    function renderConfirmationContent(){
+      summaryTitle.textContent = 'Konfirmasi Pembayaran';
+      summaryBody.innerHTML = confirmTemplate;
+      summaryCancel.style.display = '';
+      summaryConfirm.style.display = '';
+      summaryCancel.disabled = false;
+      summaryConfirm.disabled = false;
+      summaryConfirm.textContent = confirmButtonLabel;
+      summaryCancel.textContent = cancelButtonLabel;
+      summaryClose.removeAttribute('disabled');
+      summaryTotalEl = document.getElementById('summary-total');
+      summaryMethodEl = document.getElementById('summary-method');
+      if (summaryTotalEl){
+        summaryTotalEl.textContent = lastTotalText;
+      }
+      if (summaryMethodEl){
+        summaryMethodEl.textContent = lastMethodText;
+      }
+    }
+
+    function renderProcessingContent(){
+      summaryTitle.textContent = 'Proses Pembayaran';
+      summaryBody.innerHTML = '<p class=\"summary-text\">Pembayaran Sedang Dilakukan, Mohon Tunggu.</p>';
+      summaryCancel.style.display = 'none';
+      summaryConfirm.style.display = 'none';
+      summaryClose.setAttribute('disabled', 'disabled');
+    }
+
+    function renderSuccessContent(){
+      summaryTitle.textContent = 'Pembayaran Sukses';
+      summaryBody.innerHTML = '<p class=\"summary-text\">Pembayaran Berhasil Dilakukan, akan menutup dalam <strong id=\"summary-countdown\"></strong>.</p>';
+      summaryCancel.style.display = 'none';
+      summaryConfirm.style.display = 'none';
+      summaryClose.setAttribute('disabled', 'disabled');
+      const countdownEl = document.getElementById('summary-countdown');
+      if (!countdownEl){
+        closeAll(true);
+        window.location.reload();
+        return;
+      }
+      let remaining = SUCCESS_COUNTDOWN_SECONDS;
+      countdownEl.textContent = remaining;
+      countdownTimer = setInterval(function(){
+        remaining -= 1;
+        if (remaining <= 0){
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          closeAll(true);
+          window.location.reload();
+        } else {
+          countdownEl.textContent = remaining;
+        }
+      }, 1000);
+    }
+
+    function openModal(modal){
+      modal.hidden = false;
+      backdrop.hidden = false;
+      modal.classList.add('is-visible');
+      backdrop.classList.add('is-visible');
+    }
+
+    function closeModal(modal){
+      modal.hidden = true;
+      modal.classList.remove('is-visible');
+    }
+
+    function closeAll(force){
+      if (isProcessing && !force){
+        return;
+      }
+      resetTimers();
+      isProcessing = false;
+      closeModal(paymentModal);
+      closeModal(summaryModal);
+      backdrop.hidden = true;
+      backdrop.classList.remove('is-visible');
+      renderConfirmationContent();
+      trigger.focus();
+    }
+
+    function openSummary(){
+      resetTimers();
+      isProcessing = false;
+      lastTotalText = totalDisplay ? totalDisplay.textContent : '';
+      const selected = paymentForm ? paymentForm.querySelector('input[name=\"payment_method\"]:checked') : null;
+      lastMethodText = selected ? selected.nextElementSibling.textContent.trim() : 'metode yang dipilih';
+      closeModal(paymentModal);
+      renderConfirmationContent();
+      openModal(summaryModal);
+      summaryClose.focus();
+    }
+
+    function startCheckout(){
+      if (isProcessing){
+        return;
+      }
+      isProcessing = true;
+      renderProcessingContent();
+      fetch(checkoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(function(response){
+          if (!response.ok){
+            return response.json().catch(function(){ return {}; }).then(function(data){
+              const message = data && data.message ? data.message : 'Pembayaran gagal. Silakan coba lagi.';
+              throw new Error(message);
+            });
+          }
+          return response.json().catch(function(){ return {}; });
+        })
+        .then(function(){
+          processTimer = setTimeout(function(){
+            renderSuccessContent();
+          }, PROCESS_DURATION_MS);
+        })
+        .catch(function(error){
+          resetTimers();
+          const message = (error && error.message) ? error.message : 'Pembayaran gagal. Silakan coba lagi.';
+          isProcessing = false;
+          renderConfirmationContent();
+          const errorText = document.createElement('p');
+          errorText.className = 'summary-text summary-error';
+          errorText.textContent = message;
+          summaryBody.appendChild(errorText);
+        });
+    }
+
+    trigger.addEventListener('click', function(){
+      openModal(paymentModal);
+      closeBtn.focus();
+    });
+
+    confirmBtn.addEventListener('click', openSummary);
+    summaryConfirm.addEventListener('click', startCheckout);
+
+    closeBtn.addEventListener('click', function(){ closeAll(false); });
+    cancelBtn.addEventListener('click', function(){ closeAll(false); });
+    summaryClose.addEventListener('click', function(){ closeAll(false); });
+    summaryCancel.addEventListener('click', function(){ closeAll(false); });
+    backdrop.addEventListener('click', function(){ closeAll(false); });
+
+    [paymentModal, summaryModal].forEach(function(modal){
+      modal.addEventListener('keydown', function(event){
+        if (event.key === 'Escape') {
+          closeAll(false);
+        }
+      });
+    });
+  })();
+  </script>
+{% else %}
+  <div class="cart-empty">
+    <p>Keranjang kamu masih kosong.</p>
+    <a class="btn" href="{{ url_for('courses') }}">Cari Kursus</a>
+  </div>
+{% endif %}
+{% endblock %}
+
+
+
+

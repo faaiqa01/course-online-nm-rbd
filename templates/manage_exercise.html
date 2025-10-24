@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Latihan - {{ course.title }}</h2>
+<div class="card-actions">
+  <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Batal</a>
+</div>
+<form id="exercise-form" method="post" class="course-form">
+  <div class="course-field">
+    <label for="name">Nama Latihan</label>
+    <input id="name" name="name" value="{{ exercise.name if exercise else '' }}" required>
+  </div>
+  <div class="course-field">
+    <label for="description">Deskripsi</label>
+    <textarea id="description" name="description" rows="4">{{ exercise.description if exercise else '' }}</textarea>
+  </div>
+  <div class="course-field">
+    <label for="exercise_url">URL Latihan</label>
+    <input id="exercise_url" name="exercise_url" placeholder="https://..." value="{{ exercise.exercise_url if exercise else '' }}">
+  </div>
+  <div class="course-field">
+    <label for="start_date">Tanggal Mulai</label>
+    <input type="datetime-local" id="start_date" name="start_date" value="{{ exercise.start_date.strftime('%Y-%m-%dT%H:%M') if exercise and exercise.start_date else '' }}">
+  </div>
+  <div class="course-field">
+    <label for="end_date">Tanggal Selesai</label>
+    <input type="datetime-local" id="end_date" name="end_date" value="{{ exercise.end_date.strftime('%Y-%m-%dT%H:%M') if exercise and exercise.end_date else '' }}">
+  </div>
+</form>
+<div class="card-actions">
+  <button class="btn primary" type="submit" form="exercise-form">Simpan</button>
+</div>
+{% endblock %}

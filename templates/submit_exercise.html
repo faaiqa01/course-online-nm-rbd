@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Kirim Latihan - {{ course.title }}</h2>
+
+{% if submission %}
+  <div class="flash success" style="padding: 1rem; margin-bottom: 1rem; border: 1px solid green; border-radius: 5px;">
+      Latihan Anda telah dikirim dan tidak dapat diedit lagi.
+  </div>
+{% endif %}
+
+<form id="submission-form" method="post" class="course-form">
+  <div class="course-field">
+    <label for="submission_url">Link Latihan</label>
+    <input type="text" id="submission_url" name="submission_url" value="{{ submission.submission_url if submission else '' }}" required {% if submission %}disabled{% endif %}>
+  </div>
+</form>
+
+<div class="card-actions">
+  <div style="display: flex; gap: 0.5rem;">
+    <button class="btn primary" type="submit" form="submission-form" {% if submission %}disabled{% endif %}>Simpan</button>
+    <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">
+      {% if submission %}Kembali{% else %}Batal{% endif %}
+    </a>
+  </div>
+</div>
+
+<script>
+  document.getElementById('submission-form').addEventListener('submit', function(event) {
+    var confirmation = confirm("Apakah Anda yakin ingin mengirimkan latihan ini? Anda hanya dapat mengirimkannya sekali.");
+    if (!confirmation) {
+      event.preventDefault();
+    }
+  });
+</script>
+{% endblock %}

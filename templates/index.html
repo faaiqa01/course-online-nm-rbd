@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Hero Section */
+    .hero {
+        background: #f4f7fc;
+        padding: 4rem 2rem;
+        text-align: center;
+        border-radius: 8px;
+        margin-bottom: 3rem;
+    }
+    .hero h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #333;
+    }
+    .hero p {
+        font-size: 1.1rem;
+        color: #666;
+        max-width: 600px;
+        margin: 1rem auto;
+    }
+
+    /* Section Title */
+    .section-title {
+        text-align: center;
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 2.5rem;
+        position: relative;
+    }
+    .section-title::after {
+        content: '';
+        width: 60px;
+        height: 4px;
+        background: var(--primary-color);
+        border-radius: 2px;
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    /* Course Card */
+    .course-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+    .course-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        overflow: hidden;
+        transition: transform 0.3s, box-shadow 0.3s;
+        display: flex;
+        flex-direction: column;
+    }
+    .course-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    }
+    .course-card-img {
+        width: 100%;
+        height: 160px;
+        object-fit: cover;
+    }
+    .course-card-body {
+        padding: 1rem;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .course-card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .course-card-instructor {
+        font-size: 0.9rem;
+        color: #777;
+        margin-bottom: 1rem;
+    }
+    .course-card-footer {
+        margin-top: auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .course-price {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
+    /* Features Section */
+    .features-section {
+        background: #f9f9f9;
+        padding: 4rem 0;
+        margin-top: 4rem;
+    }
+    .feature-item {
+        text-align: center;
+        padding: 1.5rem;
+    }
+    .feature-icon {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+    }
+    .feature-item h3 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    .feature-item p {
+        color: #666;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      margin: 0 -15px;
+    }
+            .col-md-3 {
+                flex: 0 0 25%;
+                max-width: 25%;
+                padding: 0 15px;
+            }</style>
+
+<!-- Hero Section -->
+<div class="hero">
+    <h1>Tingkatkan Keahlian Anda, Raih Masa Depan Gemilang</h1>
+    <p>Platform kursus online dengan materi terstruktur dari para ahli di bidangnya. Mulai perjalanan belajarmu hari ini!</p>
+    <div>
+        <a class="btn" href="{{ url_for('courses') }}">Jelajahi Kursus</a>
+        {% if not current_user.is_authenticated %}
+        <a class="btn secondary" href="{{ url_for('register') }}">Daftar</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Featured Courses Section -->
+<div class="container">
+    <!-- Popular Courses -->
+    {% if popular_courses %}
+    <h2 class="section-title">Kursus Terpopuler</h2>
+    <div class="course-grid">
+        {% for course in popular_courses %}
+        <div class="course-card">
+            <img src="{{ url_for('static', filename=course.thumbnail_path) if course.thumbnail_path and not course.thumbnail_path.startswith('http') else course.thumbnail_path or 'https://via.placeholder.com/300x160.png?text=Course' }}" alt="{{ course.title }}" class="course-card-img">
+            <div class="course-card-body">
+                <h3 class="course-card-title">{{ course.title }}</h3>
+                <p class="course-card-instructor">oleh {{ course.instructor.name }}</p>
+                <div class="course-card-footer">
+                    <span class="course-price">
+                        {% if course.is_premium and course.price > 0 %}
+                            Rp {{ "{:,.0f}".format(course.price) }}
+                        {% else %}
+                            Gratis
+                        {% endif %}
+                    </span>
+                    <a href="{{ url_for('course_detail', course_id=course.id) }}" class="btn small">Lihat Detail</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Newest Courses -->
+    {% if newest_courses %}
+    <h2 class="section-title" style="margin-top: 4rem;">Kursus Terbaru</h2>
+    <div class="course-grid">
+        {% for course in newest_courses %}
+        <div class="course-card">
+            <img src="{{ url_for('static', filename=course.thumbnail_path) if course.thumbnail_path and not course.thumbnail_path.startswith('http') else course.thumbnail_path or 'https://via.placeholder.com/300x160.png?text=Course' }}" alt="{{ course.title }}" class="course-card-img">
+            <div class="course-card-body">
+                <h3 class="course-card-title">{{ course.title }}</h3>
+                <p class="course-card-instructor">oleh {{ course.instructor.name }}</p>
+                <div class="course-card-footer">
+                    <span class="course-price">
+                        {% if course.is_premium and course.price > 0 %}
+                            Rp {{ "{:,.0f}".format(course.price) }}
+                        {% else %}
+                            Gratis
+                        {% endif %}
+                    </span>
+                    <a href="{{ url_for('course_detail', course_id=course.id) }}" class="btn small">Lihat Detail</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Features Section -->
+<div class="features-section">
+    <div class="container">
+        <h2 class="section-title">Mengapa Memilih Kami?</h2>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="feature-item">
+                    <div class="feature-icon">?</div>
+                    <h3>Instruktur Ahli</h3>
+                    <p>Materi disusun dan diajarkan langsung oleh para profesional berpengalaman di industrinya.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="feature-item">
+                    <div class="feature-icon">?</div>
+                    <h3>Sertifikat Kelulusan</h3>
+                    <p>Dapatkan sertifikat resmi setelah menyelesaikan kursus untuk menunjang karir Anda.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="feature-item">
+                    <div class="feature-icon">?</div>
+                    <h3>Belajar Fleksibel</h3>
+                    <p>Akses semua materi kursus kapan saja dan di mana saja sesuai dengan kecepatan Anda.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="feature-item">
+                    <div class="feature-icon">?</div>
+                    <h3>Kemitraan Resmi</h3>
+                    <p>Kami bekerja sama dengan berbagai institusi dan perusahaan terkemuka untuk materi yang relevan.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

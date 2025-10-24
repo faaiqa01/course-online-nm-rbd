@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Quiz Details - {{ course.title }}</h2>
+<div class="card-actions">
+  <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Back</a>
+  <a class="btn" href="{{ url_for('manage_quiz_dates', course_id=course.id) }}">Atur Tanggal Kuis</a>
+  <a class="btn" href="{{ url_for('add_question', course_id=course.id) }}">Add Question</a>
+</div>
+{% if questions %}
+  <div class="question-list">
+    {% for item in questions %}
+      <div class="card question-card">
+        <div class="question-card-header">
+          <div class="question-card-actions">
+            <a class="btn secondary small" href="{{ url_for('edit_question', course_id=course.id, question_id=item.question.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('delete_question', course_id=course.id, question_id=item.question.id) }}" onsubmit="return confirm('Hapus pertanyaan ini?');">
+              <button class="btn danger small" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+        <div class="question-body"><strong>Q{{ loop.index }}.</strong> {{ item.question.text }}</div>
+        {% if item.choices %}
+          <ul class="choice-list">
+            {% for choice in item.choices %}
+              <li class="{% if choice.is_correct %}choice-correct{% endif %}">{{ choice.text }}{% if choice.is_correct %} <span class="badge">Correct</span>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="progress-note">Belum ada pilihan untuk pertanyaan ini.</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>No quiz questions yet.</p>
+{% endif %}
+{% endblock %}

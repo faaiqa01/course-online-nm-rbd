@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Quiz: {{ course.title }}</h2>
+<div class="card-actions">
+  <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Back</a>
+</div>
+<form method="post" class="quiz-form">
+  {% for q in questions %}
+    {% set question_number = loop.index %}
+    <div class="card quiz-question-card">
+      <div class="quiz-question-title"><strong>Q{{ question_number }}.</strong> {{ q.text }}</div>
+      <div class="quiz-options">
+        {% for ch in q.choices %}
+          <label class="quiz-option">
+            <input type="radio" name="q_{{ q.id }}" value="{{ ch.id }}" required>
+            <span class="quiz-option-content">
+              <span class="quiz-option-index">{{ loop.index }}</span>
+              <span class="quiz-option-text">{{ ch.text }}</span>
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  <div class="card-actions quiz-submit-actions">
+    <button class="btn" type="submit">Submit</button>
+  </div>
+</form>
+{% endblock %}<!-- placeholder -->

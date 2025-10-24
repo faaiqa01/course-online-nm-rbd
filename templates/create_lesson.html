@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+{% set is_edit = lesson is defined and lesson %}
+<h2>{{ 'Edit Lesson' if is_edit else 'Add Lesson' }} - {{ course.title }}</h2>
+<div class="card-actions">
+  <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Back</a>
+</div>
+<form id="lesson-form" method="post" class="course-form">
+  <div class="course-field">
+    <label>Title</label>
+    <input name="title" value="{{ lesson.title if is_edit else '' }}" required>
+  </div>
+
+  <div class="course-field">
+    <label for="start_date">Tanggal Mulai</label>
+    <input type="datetime-local" id="start_date" name="start_date"
+           value="{{ lesson.start_date.strftime('%Y-%m-%dT%H:%M') if is_edit and lesson.start_date else '' }}">
+  </div>
+
+  <div class="course-field">
+    <label for="category">Kategori Materi</label>
+    <select id="category" name="category">
+      <option value="" {% if not (is_edit and (lesson.video_url or lesson.meeting_url)) %}selected{% endif %}>Pilih Kategori</option>
+      <option value="video" {% if is_edit and lesson.video_url %}selected{% endif %}>Video URL</option>
+      <option value="meeting" {% if is_edit and lesson.meeting_url %}selected{% endif %}>Pertemuan</option>
+    </select>
+  </div>
+
+  <div id="video-url-field" class="course-field">
+    <label>Video URL</label>
+    <input name="video_url" placeholder="https://..." value="{{ lesson.video_url if is_edit else '' }}">
+  </div>
+
+  <div id="meeting-url-field" class="course-field">
+    <label>URL Pertemuan</label>
+    <input type="text" name="meeting_url" placeholder="https://..." value="{{ lesson.meeting_url if is_edit else '' }}">
+  </div>
+
+  <div class="course-field">
+    <label>Content</label>
+    <textarea name="content" rows="4">{{ lesson.content if is_edit else '' }}</textarea>
+  </div>
+</form>
+<div class="card-actions">
+  <button class="btn" type="submit" form="lesson-form">Simpan</button>
+  {% if is_edit %}
+    <form method="post" action="{{ url_for('delete_lesson', course_id=course.id, lesson_id=lesson.id) }}" style="display:inline" onsubmit="return confirm('Yakin ingin menghapus lesson ini?');">
+      <button class="btn danger" type="submit">Hapus Materi</button>
+    </form>
+  {% endif %}
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.getElementById('category');
+    const videoUrlField = document.getElementById('video-url-field');
+    const meetingUrlField = document.getElementById('meeting-url-field');
+
+    function toggleFields() {
+      if (categorySelect.value === 'video') {
+        videoUrlField.style.display = 'block';
+        meetingUrlField.style.display = 'none';
+      } else if (categorySelect.value === 'meeting') {
+        videoUrlField.style.display = 'none';
+        meetingUrlField.style.display = 'block';
+      } else {
+        videoUrlField.style.display = 'none';
+        meetingUrlField.style.display = 'none';
+      }
+    }
+
+    categorySelect.addEventListener('change', toggleFields);
+    toggleFields(); // Initial call to set the correct fields on page load
+  });
+</script>
+{% endblock %}
