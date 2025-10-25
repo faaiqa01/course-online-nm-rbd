@@ -4,7 +4,7 @@
 <div class="card-actions">
   <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Back</a>
 </div>
-<form method="post" class="quiz-form">
+<form id="quiz-form" method="post" class="quiz-form">
   {% for q in questions %}
     {% set question_number = loop.index %}
     <div class="card quiz-question-card">
@@ -26,4 +26,53 @@
     <button class="btn" type="submit">Submit</button>
   </div>
 </form>
+<script>
+  (function() {
+    const quizForm = document.getElementById('quiz-form');
+    if (!quizForm) return;
+
+    const storageKey = 'quiz_answers_course_{{ course.id }}';
+
+    const loadAnswers = () => {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey)) || {};
+      } catch (err) {
+        console.warn('Tidak dapat memuat jawaban kuis dari penyimpanan.', err);
+        return {};
+      }
+    };
+
+    const saveAnswers = (answers) => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(answers));
+      } catch (err) {
+        console.warn('Tidak dapat menyimpan jawaban kuis ke penyimpanan.', err);
+      }
+    };
+
+    const answers = loadAnswers();
+
+    quizForm.querySelectorAll('input[type="radio"]').forEach((input) => {
+      const questionId = input.name.replace('q_', '');
+      if (answers[questionId] && answers[questionId] === input.value) {
+        input.checked = true;
+      }
+
+      input.addEventListener('change', () => {
+        const updatedAnswers = loadAnswers();
+        updatedAnswers[questionId] = input.value;
+        saveAnswers(updatedAnswers);
+      });
+    });
+
+    quizForm.addEventListener('submit', function(event) {
+      const confirmed = confirm('Apakah Anda yakin ingin menyimpan jawaban? Kuis hanya dapat disubmit satu kali.');
+      if (!confirmed) {
+        event.preventDefault();
+        return;
+      }
+      localStorage.removeItem(storageKey);
+    });
+  })();
+</script>
 {% endblock %}<!-- placeholder -->

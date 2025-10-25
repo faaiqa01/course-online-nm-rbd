@@ -152,7 +152,12 @@
         {% if course.quiz_end_date %}
             <p><strong>Kuis ditutup pada:</strong> {{ course.quiz_end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
         {% endif %}
-        <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
+        {% if current_user.is_authenticated and current_user.role == 'student' and attempt %}
+            <p><strong>Anda sudah mengerjakan kuis ini. Kuis hanya dapat dikerjakan satu kali.</strong></p>
+            <button class="btn" disabled>Mulai Kuis</button>
+        {% else %}
+            <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
+        {% endif %}
     {% endif %}
   {% elif not current_user.is_authenticated or current_user.role == 'student' %}
     {% if course.is_premium %}

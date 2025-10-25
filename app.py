@@ -1685,7 +1685,17 @@ def take_quiz(course_id):
         flash('Enroll and unlock first', 'error')
         return redirect(url_for('course_detail', course_id=course_id))
     qs = Question.query.filter_by(course_id=course_id).all()
+    latest_attempt = None
+    if current_user.role == 'student':
+        latest_attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
+        if latest_attempt and request.method == 'GET':
+            flash('Anda sudah menyelesaikan kuis ini. Kuis hanya dapat dikerjakan satu kali.', 'error')
+            return redirect(url_for('course_detail', course_id=course_id))
+
     if request.method == 'POST':
+        if current_user.role == 'student' and latest_attempt:
+            flash('Kuis hanya dapat dikirim satu kali.', 'error')
+            return redirect(url_for('course_detail', course_id=course_id))
         correct = 0
         total = len(qs)
         for q in qs:

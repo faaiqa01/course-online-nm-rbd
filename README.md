@@ -22,6 +22,7 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
     - Halaman **Kursus Saya** untuk melihat semua kursus yang telah diikuti.
     - Melacak kemajuan belajar (materi yang telah selesai).
     - Mengikuti kuis dan melihat skor.
+- **Kuis Sekali Coba** (Okt 2025): Siswa hanya dapat mengirim kuis satu kali. Jawaban sementara tersimpan otomatis di browser dan tombol submit menampilkan konfirmasi sebelum penyimpanan final.
 - **Sertifikat**: Unduh sertifikat (format `.docx`) setelah menyelesaikan semua materi dan mendapatkan skor kuis 100.
 - **Catatan Pembaruan Sertifikat (Okt 2025)**: Generator kini menghasilkan file PDF langsung dari template gambar `file_pendukung/sertifikat/docx/template Sertifikat LMS.png` menggunakan Pillow. Jalankan `pip install -r requirements.txt` setelah menarik pembaruan ini.
 - **Lokalisasi**: Antarmuka pengguna sebagian besar telah diterjemahkan ke dalam Bahasa Indonesia.
