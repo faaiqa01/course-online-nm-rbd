@@ -25,6 +25,8 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
 - **Kuis Sekali Coba** (Okt 2025): Siswa hanya dapat mengirim kuis satu kali. Jawaban sementara tersimpan otomatis di browser dan tombol submit menampilkan konfirmasi sebelum penyimpanan final.
 - **Sertifikat**: Unduh sertifikat (format `.docx`) setelah menyelesaikan semua materi dan mendapatkan skor kuis 100.
 - **Catatan Pembaruan Sertifikat (Okt 2025)**: Generator kini menghasilkan file PDF langsung dari template gambar `file_pendukung/sertifikat/docx/template Sertifikat LMS.png` menggunakan Pillow. Jalankan `pip install -r requirements.txt` setelah menarik pembaruan ini.
+- **Asisten AI Terintegrasi**: Pengguna yang login dapat membuka halaman chatbot (menggunakan OpenRouter API) untuk tanya jawab materi dan bantuan navigasi platform.
+- **Profil Platform Interaktif**: Tombol judul "TechNova Academy" di navigasi menampilkan modal About yang menjelaskan layanan kursus Microsoft Office beserta tautan Instagram dan TikTok.
 - **Lokalisasi**: Antarmuka pengguna sebagian besar telah diterjemahkan ke dalam Bahasa Indonesia.
 
 ## Teknologi yang Digunakan
@@ -105,6 +107,21 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
     ```
     Ini akan membuat database (jika belum ada) dan semua tabel sesuai dengan skema terakhir.
 
+### Konfigurasi Opsional: Asisten AI
+
+Untuk mengaktifkan chatbot yang terintegrasi:
+
+1. Pastikan Anda memiliki akun dan API key OpenRouter (atau penyedia lain yang kompatibel dengan format OpenAI API).
+2. Isi variabel berikut di `.env`:
+    - `AI_PROVIDER=openrouter`
+    - `AI_API_KEY=<API_KEY_ANDA>`
+    - `AI_MODEL=openrouter/auto` (atau model lain yang tersedia)
+    - `AI_BASE_URL=https://openrouter.ai/api/v1/chat/completions` (default, boleh dikosongkan jika sama)
+    - `APP_BASE_URL` opsional untuk header referer.
+3. Jika variabel tidak diisi atau provider bukan `openrouter`, tombol Asisten AI tetap ada tetapi akan memberi pesan fallback.
+
+> Catatan: File log chatbot disimpan di direktori `logs/app.log` dengan rotasi otomatis (`RotatingFileHandler`).
+
 ## Menjalankan Aplikasi
 
 Setelah instalasi selesai, jalankan aplikasi dengan perintah:
@@ -127,6 +144,8 @@ Aplikasi akan berjalan di `http://127.0.0.1:5000`.
     - Buka menu **Keranjang**, tinjau item, lalu selesaikan "pembayaran" (simulasi).
     - Buka menu **Kursus Saya** untuk melihat kursus yang sudah terdaftar.
     - Selesaikan semua materi dan ikuti kuis hingga mendapat skor 100 untuk dapat mengunduh **Sertifikat**.
+4.  Klik label **TechNova Academy** di navigasi untuk membuka modal About yang menjelaskan layanan kursus serta menyediakan tautan Instagram & TikTok.
+5.  Gunakan menu **Asisten AI** (dengan kredensial API yang valid) untuk mendapatkan bantuan materi atau rekomendasi kursus secara instan.
 
 ## Panduan Menggunakan Ngrok
 
@@ -139,6 +158,11 @@ Untuk membuat aplikasi lokal Anda dapat diakses dari internet (misalnya untuk de
     .\ngrok.exe http 5000
     ```
 4.  Ngrok akan memberikan URL publik yang bisa Anda gunakan.
+
+## Aset Media & Styling
+
+- Ikon sosial media untuk modal About disimpan di `static/images/Instagram_icon.png` dan `static/images/tiktok_icon.png`. Pastikan direktori ini tersedia jika Anda men-deploy ke hosting baru.
+- Seluruh styling utama berada di `static/styles.css`. Komponen modal About dan tombol brand menggunakan kelas `.about-modal-*`, `.about-social-links`, dan `.nav-brand`.
 
 ## Struktur Proyek
 
@@ -186,3 +210,37 @@ lms_flask_mysql/
     ├── student_detail_for_instructor.html
     └── submit_exercise.html
 ```
+
+## Panduan Verifikasi Instruktur
+
+- Instruktur yang baru mendaftar akan diarahkan ke halaman profil sampai mengunggah bukti kredensial. Lengkapi nama, email, beserta data profesional agar kursus dapat diterbitkan.
+- Isi bidang `Bidang Keahlian`, `Asal Lembaga`, dan `Lama Mengajar (tahun)` supaya detail instruktur terlihat di katalog.
+- Pilih tipe sertifikat: `PDF`/`Gambar` untuk unggah file (tersimpan di `static/uploads/certificates`) atau `Link Eksternal` bila sertifikat disimpan di luar aplikasi. Tipe `Default` menandakan belum ada bukti yang diunggah.
+- Tombol `Hapus Sertifikat` akan membersihkan file/link sehingga status kembali belum terverifikasi. Saat status belum terverifikasi, instruktur hanya bisa membuka profil dan logout.
+- Setelah data tersimpan dan valid, badge profil berubah menjadi `Terverifikasi` dan seluruh menu instruktur kembali dapat diakses.
+
+## Manajemen Latihan & Penilaian
+
+- Setiap kursus dapat memiliki satu latihan yang dikelola melalui tombol **Details Latihan** di detail kursus instruktur.
+- Atur nama, deskripsi, URL latihan, serta jadwal mulai/akhir (format `datetime-local`). Siswa hanya dapat melihat dan mengerjakan latihan dalam rentang jadwal yang diizinkan.
+- Siswa membuka tombol **Mulai Latihan** untuk mengirim tautan pekerjaan. Setiap siswa hanya memiliki satu submission per kursus.
+- Instruktur menilai submission lewat halaman **Detail Siswa** → **Update Exercise Score**. Nilai ini akan muncul kembali di detail kursus siswa.
+- Untuk penerbitan sertifikat otomatis, pastikan setiap submission dinilai **> 0** jika kursus mensyaratkan latihan.
+
+## Pengelolaan Media Kursus & Branding
+
+- Thumbnail kursus dapat berasal dari unggahan file atau URL eksternal. File tersimpan di `static/uploads/thumbnails`; direktori dibuat otomatis saat upload pertama.
+- Template sertifikat berada di `file_pendukung/sertifikat/docx/`. Aset ikon brand (Instagram/TikTok) tersedia di `file_pendukung/logo/` dan digandakan ke `static/images/` untuk dipakai modal About.
+- Materi per pelajaran mendukung teks, link video (YouTube/Vimeo), link meeting, serta jadwal publikasi (`start_date`).
+- Simpan file tambahan (misalnya hasil export modul) di folder `static/uploads/` agar dapat diakses publik, atau gunakan storage eksternal bila file berukuran besar.
+
+## Logging & Monitoring
+
+- Aplikasi menulis log rotasi otomatis ke `logs/app.log` (maksimal ±500 KB per file, dengan 5 cadangan). File ini berguna untuk melacak error, aktivitas login, dan panggilan API OpenRouter.
+- Kegagalan konfigurasi chatbot (misal API key kosong) juga dicatat ke log. Periksa file ini ketika tombol Asisten AI hanya menampilkan pesan fallback.
+
+## Catatan Sinkronisasi Database
+
+- Setelah menarik pembaruan terbaru, jalankan `flask db upgrade` untuk menerapkan migrasi yang tersimpan pada folder `migrations/`.
+- File `DB_SYNC_INSTRUCTIONS.txt` merangkum DDL penting (penambahan harga kursus dan tabel keranjang) bila Anda perlu menerapkannya secara manual.
+- Jika database lama belum memiliki kolom `thumbnail_path`, ikuti panduan pada `fix_thumbnail_column.txt` atau jalankan migrasi terbaru sebelum menggunakan fitur upload thumbnail.

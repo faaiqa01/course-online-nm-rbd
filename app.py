@@ -7,9 +7,13 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+from typing import TYPE_CHECKING
 from sqlalchemy import inspect, text, func
 import re
 import os
+import logging
+from logging.handlers import RotatingFileHandler
+import requests
 from dotenv import load_dotenv
 
 from sqlalchemy.orm import joinedload
@@ -18,6 +22,14 @@ try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:  # pragma: no cover - dependency issue surfaced at runtime
     Image = ImageDraw = ImageFont = None
+
+if TYPE_CHECKING:
+    from PIL.ImageFont import FreeTypeFont as PILFreeTypeFont
+elif ImageFont is not None and hasattr(ImageFont, 'FreeTypeFont'):
+    PILFreeTypeFont = ImageFont.FreeTypeFont
+else:
+    class PILFreeTypeFont:  # pragma: no cover - simple fallback type when Pillow unavailable
+        pass
 
 load_dotenv()
 
@@ -40,6 +52,16 @@ else:
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+# Setup rotating file log handler
+LOG_DIR = Path(app.root_path) / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+log_file_path = LOG_DIR / 'app.log'
+if not any(isinstance(handler, RotatingFileHandler) for handler in app.logger.handlers):
+    file_handler = RotatingFileHandler(log_file_path, maxBytes=512000, backupCount=5, encoding='utf-8')
+    file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
 
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -47,6 +69,175 @@ THUMBNAIL_UPLOAD_DIR = Path(app.static_folder) / 'uploads' / 'thumbnails'
 
 ALLOWED_CERTIFICATE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 CERTIFICATE_UPLOAD_DIR = Path(app.static_folder) / 'uploads' / 'certificates'
+
+def call_openrouter(messages, *, max_tokens=300):
+    """Kirim permintaan ke OpenRouter dan kembalikan respons teks."""
+    if os.getenv('AI_PROVIDER', '').lower() != 'openrouter':
+        app.logger.warning('AI_PROVIDER bukan openrouter; chatbot dinonaktifkan.')
+        return None
+
+    api_key = os.getenv('AI_API_KEY')
+    if not api_key:
+        app.logger.warning('OpenRouter API key belum diatur.')
+        return None
+
+    base_url = os.getenv('AI_BASE_URL', 'https://openrouter.ai/api/v1/chat/completions')
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'HTTP-Referer': os.getenv('APP_BASE_URL', 'http://localhost:5000'),
+        'X-Title': 'LMS AI Assistant',
+    }
+    payload = {
+        'model': os.getenv('AI_MODEL', 'openrouter/auto'),
+        'messages': messages,
+        'max_tokens': max_tokens,
+    }
+
+    app.logger.info('Mengirim permintaan AI model %s dengan %d pesan', payload['model'], len(messages))
+
+    try:
+        response = requests.post(base_url, headers=headers, json=payload, timeout=20)
+    except requests.RequestException:
+        app.logger.exception('Gagal memanggil OpenRouter')
+        return None
+
+    if response.status_code >= 400:
+        app.logger.error('OpenRouter error %s: %s', response.status_code, response.text)
+        return None
+
+    try:
+        data = response.json()
+    except ValueError:
+        app.logger.error('Respons OpenRouter bukan JSON valid: %s', response.text)
+        return None
+
+    choices = data.get('choices') or []
+    if not choices:
+        app.logger.error('OpenRouter tidak mengembalikan pilihan respons: %s', data)
+        return None
+
+    message = choices[0].get('message') or {}
+    content = message.get('content')
+
+    if isinstance(content, list):
+        filtered_segments = []
+        for part in content:
+            if isinstance(part, dict):
+                segment_type = (part.get('type') or '').lower()
+                text = part.get('text', '')
+                if segment_type in {'reasoning', 'thinking', 'chain_of_thought', 'analysis'}:
+                    continue
+                if text:
+                    filtered_segments.append(text)
+            else:
+                filtered_segments.append(str(part))
+        content = ' '.join(filtered_segments).strip()
+
+
+
+    if not content:
+        reasoning = message.get('reasoning')
+        if isinstance(reasoning, list):
+            collected = []
+            for part in reasoning:
+                if isinstance(part, dict):
+                    text = part.get('text', '')
+                    if text:
+                        collected.append(text)
+                else:
+                    collected.append(str(part))
+            reasoning = "\n".join(collected)
+        if isinstance(reasoning, str):
+            chunks = [section.strip() for section in re.split(r"\n\s*\n", reasoning) if section.strip()]
+            if chunks:
+                content = chunks[-1]
+            elif reasoning.strip():
+                content = reasoning.strip()
+
+    if not content:
+        app.logger.error('OpenRouter tidak mengembalikan konten pesan: %s', message)
+        return None
+
+    return content.strip()
+
+SYSTEM_PROMPT = ("Kamu adalah Asisten AI LMS Mandiri. Bantu pengguna dalam Bahasa Indonesia, jelaskan materi MS Office, alur kursus, dan langkah di platform ini. Gunakan informasi katalog yang diberikan untuk menjawab pertanyaan kursus dan rekomendasi belajar. Jika data tidak tersedia, arahkan pengguna membuka halaman Kursus atau hubungi admin dengan sopan.")
+FALLBACK_AI_REPLY = 'Maaf, asisten AI sedang tidak dapat merespons. Coba lagi nanti'
+STUDENT_FEATURES_CONTEXT = (
+    "Fitur role student mencakup: menjelajahi katalog kursus lengkap dengan filter materi, status premium, dan pencarian; "
+    "melihat detail kursus termasuk profil instruktur, daftar materi, status enrollment, dan progres belajar; menambahkan atau "
+    "menghapus kursus premium dari keranjang lalu melakukan checkout manual setelah konfirmasi; mengelola halaman Kursus Saya "
+    "untuk memantau progres materi/quiz/latihan; menandai materi selesai; mengirim latihan satu kali; mengikuti kuis satu kali "
+    "dengan syarat enrollment aktif; serta mengunduh sertifikat setelah seluruh syarat terpenuhi. Asisten hanya boleh memberikan "
+    "panduan langkah, tidak melakukan checkout otomatis atau tindakan yang memerlukan izin pengguna."
+)
+
+def build_catalog_context() -> str:
+    """Ambil ringkasan kursus untuk dimasukkan ke prompt AI."""
+    try:
+        total_courses = Course.query.count()
+        free_courses = Course.query.filter_by(is_premium=False).count()
+        premium_courses = Course.query.filter_by(is_premium=True).count()
+        popular_courses = (
+            db.session.query(Course.title, func.count(Enrollment.id).label('enrolled'))
+            .outerjoin(Enrollment, Enrollment.course_id == Course.id)
+            .group_by(Course.id)
+            .order_by(func.count(Enrollment.id).desc(), Course.title.asc())
+            .limit(5)
+            .all()
+        )
+        latest_courses = Course.query.order_by(Course.id.desc()).limit(3).all()
+    except Exception:  # pragma: no cover - defensive
+        app.logger.exception('Gagal menyiapkan konteks katalog AI')
+        return ''
+
+    parts = []
+    if total_courses:
+        parts.append(f'Tersedia {total_courses} kursus (gratis: {free_courses}, premium: {premium_courses}).')
+
+    if popular_courses:
+        popular_labels = []
+        for title, count in popular_courses:
+            if not title:
+                continue
+            label = title
+            if count:
+                label += f' ({int(count)} siswa)'
+            popular_labels.append(label)
+        if popular_labels:
+            parts.append('Kursus terpopuler: ' + '; '.join(popular_labels) + '.')
+
+    if latest_courses:
+        latest_titles = [course.title for course in latest_courses if getattr(course, 'title', None)]
+        if latest_titles:
+            parts.append('Kursus terbaru: ' + ', '.join(latest_titles) + '.')
+
+    return ' '.join(parts)
+
+def build_chat_messages(user_message: str, *, user=None) -> list[dict]:
+    """Siapkan payload percakapan untuk OpenRouter."""
+    user_context = []
+    if user:
+        role_label = 'instruktur' if getattr(user, 'role', 'student') == 'instructor' else 'siswa'
+        user_context.append(f'Pengguna bernama {getattr(user, "name", "Pengguna")} berperan sebagai {role_label}.')
+        expertise = getattr(user, 'expertise', None)
+        if expertise:
+            user_context.append(f'Keahlian: {expertise}.')
+    system_message = SYSTEM_PROMPT
+    if user_context:
+        system_message += ' Informasi pengguna: ' + ' '.join(user_context)
+    if getattr(user, 'role', None) == 'student':
+        system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
+
+    catalog_context = build_catalog_context()
+    if catalog_context:
+        system_message += ' Informasi katalog: ' + catalog_context
+
+    return [
+        {'role': 'system', 'content': system_message},
+        {'role': 'user', 'content': user_message.strip()},
+    ]
+
+
 
 def build_certificate_pdf(*, background_path: Path, student_name: str, instructor_name: str,
                           material_type: str, course_title: str, issued_date: str) -> BytesIO:
@@ -69,7 +260,7 @@ def build_certificate_pdf(*, background_path: Path, student_name: str, instructo
         None,
     ]
 
-    def load_font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont:
+    def load_font(size: int, *, bold: bool = False) -> PILFreeTypeFont:
         regular_candidates = ['Arial.ttf', 'arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf']
         bold_candidates = ['Arial Bold.ttf', 'arialbd.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf']
         candidates = bold_candidates if bold else regular_candidates
@@ -93,7 +284,7 @@ def build_certificate_pdf(*, background_path: Path, student_name: str, instructo
     info_font = load_font(30)
     signature_font = load_font(32, bold=True)
 
-    def draw_centered(text: str, center_x: float, y: float, font: ImageFont.FreeTypeFont,
+    def draw_centered(text: str, center_x: float, y: float, font: PILFreeTypeFont,
                       *, fill=text_color, line_gap: int = 10) -> float:
         if not text:
             return y
@@ -104,13 +295,13 @@ def build_certificate_pdf(*, background_path: Path, student_name: str, instructo
         draw.text((x, int(y)), text, font=font, fill=fill)
         return y + text_height + line_gap
 
-    def measure_width(value: str, font: ImageFont.FreeTypeFont) -> float:
+    def measure_width(value: str, font: PILFreeTypeFont) -> float:
         if hasattr(draw, 'textlength'):
             return draw.textlength(value, font=font)
         bbox = draw.textbbox((0, 0), value, font=font)
         return bbox[2] - bbox[0]
 
-    def wrap_text(value: str, font: ImageFont.FreeTypeFont, max_width: float) -> list[str]:
+    def wrap_text(value: str, font: PILFreeTypeFont, max_width: float) -> list[str]:
         words = value.split()
         lines = []
         current = ''
@@ -245,7 +436,6 @@ class CartItem(db.Model):
 
 
 
-
 class LessonProgress(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -253,7 +443,6 @@ class LessonProgress(db.Model):
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (db.UniqueConstraint('user_id', 'lesson_id', name='uq_user_lesson'),)
-
 
 class Exercise(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -263,7 +452,6 @@ class Exercise(db.Model):
     exercise_url = db.Column(db.String(500), default='')
     start_date = db.Column(db.DateTime, nullable=True)
     end_date = db.Column(db.DateTime, nullable=True)
-
 
 class ExerciseSubmission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -275,7 +463,6 @@ class ExerciseSubmission(db.Model):
     __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_exercise_submission_user_course'),)
 
 
-
 def ensure_course_thumbnail_column():
     try:
         inspector = inspect(db.engine)
@@ -285,7 +472,6 @@ def ensure_course_thumbnail_column():
                 conn.execute(text("ALTER TABLE course ADD COLUMN thumbnail_path VARCHAR(500)"))
     except Exception as exc:
         app.logger.warning('Could not ensure thumbnail column: %s', exc)
-
 
 def _is_allowed_image(filename):
     if not filename or '.' not in filename:
@@ -305,13 +491,11 @@ def save_course_thumbnail(file_storage):
     relative_path = Path('uploads') / 'thumbnails' / sanitized
     return str(relative_path).replace('\\', '/')
 
-
 def is_valid_thumbnail_url(url):
     if not url:
         return False
     parsed = urlparse(url)
     return parsed.scheme in ('http', 'https') and bool(parsed.netloc)
-
 
 def delete_course_thumbnail(thumbnail_path):
     if not thumbnail_path or thumbnail_path.startswith('http'):
@@ -324,7 +508,6 @@ def delete_course_thumbnail(thumbnail_path):
                 target.unlink()
     except Exception as exc:
         app.logger.warning('Failed to delete thumbnail %s: %s', thumbnail_path, exc)
-
 
 def resolve_thumbnail_input(thumbnail_file, thumbnail_url, existing_path=None, mode=None):
     mode = (mode or '').lower()
@@ -392,7 +575,6 @@ def save_certificate_file(file_storage):
     relative_path = Path('uploads') / 'certificates' / sanitized
     return str(relative_path).replace('\\', '/')
 
-
 def delete_certificate_file(certificate_path):
     if not certificate_path or certificate_path.startswith('http'):
         return
@@ -405,10 +587,8 @@ def delete_certificate_file(certificate_path):
     except Exception as exc:
         app.logger.warning('Failed to delete certificate %s: %s', certificate_path, exc)
 
-
 def is_valid_url(url):
     return is_valid_thumbnail_url(url)
-
 
 def prepare_video_embed(video_url):
     if not video_url:
@@ -460,6 +640,34 @@ def check_instructor_verification():
             return redirect(url_for('profile'))
 
 # ---------- Routes ----------
+
+@app.route('/ai-chat')
+@login_required
+def ai_chat_page():
+    return render_template('ai_chat.html', title='Asisten AI')
+
+@app.route('/api/ai-chat', methods=['POST'])
+@login_required
+def api_ai_chat():
+    payload = request.get_json(silent=True) or {}
+    user_message = (payload.get('message') or '').strip()
+
+    if not user_message:
+        return jsonify({'error': 'Pesan tidak boleh kosong.'}), 400
+
+    if len(user_message) > 500:
+        return jsonify({'error': 'Pesan terlalu panjang. Maksimal 500 karakter.'}), 400
+
+    app.logger.info('AI chat request user_id=%s role=%s len=%s', getattr(current_user, 'id', 'anon'), getattr(current_user, 'role', 'unknown'), len(user_message))
+
+    messages = build_chat_messages(user_message, user=current_user)
+    ai_reply = call_openrouter(messages)
+
+    if not ai_reply:
+        return jsonify({'reply': FALLBACK_AI_REPLY})
+
+    return jsonify({'reply': ai_reply})
+
 @app.route('/')
 def index():
     # Query untuk kursus terpopuler berdasarkan jumlah pendaftar
@@ -742,7 +950,6 @@ def my_courses():
     return render_template('my_courses.html', courses=courses, progress_map=progress_map, enrollment_status=enrollment_status,
                            selected_material_type=material_type, selected_is_premium=is_premium, search_query=search)
 
-
 @app.route('/course/<int:course_id>')
 def course_detail(course_id):
     c = Course.query.get_or_404(course_id)
@@ -818,7 +1025,6 @@ def course_detail(course_id):
                            attempt=attempt, progress=progress, exercise=exercise, exercise_submission=exercise_submission, now=datetime.utcnow() + timedelta(hours=7))
 
 
-
 @app.route('/cart')
 @login_required
 def cart():
@@ -837,7 +1043,6 @@ def cart():
     subtotal = sum((entry['course'].price or 0) for entry in entries)
     total = subtotal
     return render_template('cart.html', items=entries, subtotal=subtotal, total=total)
-
 
 @app.route('/cart/add/<int:course_id>', methods=['POST'])
 @login_required
@@ -881,7 +1086,6 @@ def add_to_cart(course_id):
     flash('Course ditambahkan ke keranjang.', 'success')
     return _redirect_destination()
 
-
 @app.route('/cart/remove/<int:course_id>', methods=['POST'])
 @login_required
 def remove_from_cart(course_id):
@@ -908,7 +1112,6 @@ def remove_from_cart(course_id):
     db.session.commit()
     flash('Course dihapus dari keranjang.', 'success')
     return _redirect_destination()
-
 
 @app.route('/cart/checkout', methods=['POST'])
 @login_required
@@ -1140,7 +1343,6 @@ def edit_course(course_id):
         return redirect(url_for('edit_course', course_id=course_id))
     return render_template('create_course.html', course=course)
 
-
 @app.route('/course/<int:course_id>/delete', methods=['POST'])
 @login_required
 def delete_course(course_id):
@@ -1207,7 +1409,6 @@ def create_lesson(course_id):
         return redirect(url_for('course_detail', course_id=course_id))
     return render_template('create_lesson.html', course=c, lesson=None)
 
-
 @app.route('/course/<int:course_id>/lesson/<int:lesson_id>/edit', methods=['GET','POST'])
 @login_required
 def edit_lesson(course_id, lesson_id):
@@ -1239,7 +1440,6 @@ def edit_lesson(course_id, lesson_id):
         flash('Lesson updated', 'success')
         return redirect(url_for('course_detail', course_id=course_id))
     return render_template('create_lesson.html', course=course, lesson=lesson)
-
 
 
 @app.route('/course/<int:course_id>/lesson/<int:lesson_id>/delete', methods=['POST'])
@@ -1446,9 +1646,7 @@ def add_question(course_id):
     return render_template('add_question.html', course=course, question=None, choices=choices)
 
 
-
 @app.route('/course/<int:course_id>/quiz/manage', methods=['GET', 'POST'])
-
 
 
 @login_required
@@ -1462,13 +1660,11 @@ def manage_quiz(course_id):
     course = Course.query.get_or_404(course_id)
 
 
-
     if current_user.role != 'instructor' or course.instructor_id != current_user.id:
 
 
 
         flash('Instructor only', 'error')
-
 
 
         return redirect(url_for('course_detail', course_id=course_id))
@@ -1478,9 +1674,7 @@ def manage_quiz(course_id):
 
 
 
-
     questions = Question.query.filter_by(course_id=course_id).order_by(Question.id.asc()).all()
-
 
 
     question_ids = [q.id for q in questions]
@@ -1498,13 +1692,11 @@ def manage_quiz(course_id):
         all_choices = Choice.query.filter(Choice.question_id.in_(question_ids)).order_by(Choice.id.asc()).all()
 
 
-
         for choice in all_choices:
 
 
 
             choices_map.setdefault(choice.question_id, []).append(choice)
-
 
 
     data = []
@@ -1518,7 +1710,6 @@ def manage_quiz(course_id):
         data.append({'question': question, 'choices': choices_map.get(question.id, [])})
 
 
-
     return render_template('manage_quiz.html', course=course, questions=data)
 
 
@@ -1526,9 +1717,7 @@ def manage_quiz(course_id):
 
 
 
-
 @app.route('/course/<int:course_id>/quiz/dates/manage', methods=['GET', 'POST'])
-
 
 
 @login_required
@@ -1542,7 +1731,6 @@ def manage_quiz_dates(course_id):
     course = Course.query.get_or_404(course_id)
 
 
-
     if current_user.role != 'instructor' or course.instructor_id != current_user.id:
 
 
@@ -1550,9 +1738,7 @@ def manage_quiz_dates(course_id):
         flash('Instructor only', 'error')
 
 
-
         return redirect(url_for('course_detail', course_id=course_id))
-
 
 
 
@@ -1566,9 +1752,7 @@ def manage_quiz_dates(course_id):
         quiz_start_date_str = request.form.get('quiz_start_date')
 
 
-
         quiz_end_date_str = request.form.get('quiz_end_date')
-
 
 
 
@@ -1590,9 +1774,7 @@ def manage_quiz_dates(course_id):
         db.session.commit()
 
 
-
         flash('Quiz dates updated successfully.', 'success')
-
 
 
         return redirect(url_for('manage_quiz_dates', course_id=course_id))
@@ -1602,9 +1784,7 @@ def manage_quiz_dates(course_id):
 
 
 
-
     return render_template('manage_quiz_dates.html', course=course)
-
 
 @app.route('/course/<int:course_id>/question/<int:question_id>/edit', methods=['GET','POST'])
 @login_required
@@ -1660,7 +1840,6 @@ def edit_question(course_id, question_id):
     current_correct = next((slot['index'] for slot in choice_slots if slot['is_correct']), '1')
     return render_template('add_question.html', course=course, question=question, choices=choice_slots, current_correct=str(current_correct))
 
-
 @app.route('/course/<int:course_id>/question/<int:question_id>/delete', methods=['POST'])
 @login_required
 def delete_question(course_id, question_id):
@@ -1674,7 +1853,6 @@ def delete_question(course_id, question_id):
     db.session.commit()
     flash('Question deleted', 'success')
     return redirect(url_for('manage_quiz', course_id=course_id))
-
 
 @app.route('/course/<int:course_id>/quiz', methods=['GET','POST'])
 @login_required
@@ -1718,7 +1896,6 @@ def take_quiz(course_id):
         choices = Choice.query.filter_by(question_id=q.id).all()
         data.append({'id': q.id, 'text': q.text, 'choices': choices})
     return render_template('quiz.html', course=c, questions=data)
-
 
 @app.route('/course/<int:course_id>/certificate/download')
 @login_required
@@ -1810,7 +1987,6 @@ def certificate(course_id):
 if __name__ == '__main__':
     is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
     app.run(debug=is_debug)
-
 
 
 
