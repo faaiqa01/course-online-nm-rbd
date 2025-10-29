@@ -33,3 +33,7 @@ test.txt
 
 /laporan
 /lain
+
+# File upload statis
+static/uploads/
+
