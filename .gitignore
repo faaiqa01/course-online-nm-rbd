@@ -14,8 +14,8 @@ __pycache__/
 .idea/
 .vscode/
 
-# File upload (seperti thumbnail)
-static/uploads/
+# File log aplikasi
+logs/
 
 # File executable
 ngrok.exe
