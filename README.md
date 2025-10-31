@@ -65,6 +65,10 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
     source venv/bin/activate
     ```
 
+    #Aktifkan diGitbash
+    source venv/Scripts/activate
+    ...
+
 3.  **Konfigurasi Environment (.env)**
     Buat file `.env` di direktori root dengan menyalin dari `.env.example`.
     ```bash
@@ -155,7 +159,9 @@ Untuk membuat aplikasi lokal Anda dapat diakses dari internet (misalnya untuk de
 2.  Buka terminal baru di direktori proyek.
 3.  Jalankan perintah:
     ```bash
-    .\ngrok.exe http 5000
+
+    ./ngrok.exe http 3000
+
     ```
 4.  Ngrok akan memberikan URL publik yang bisa Anda gunakan.
 

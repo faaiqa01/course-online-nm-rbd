@@ -160,7 +160,7 @@ def call_openrouter(messages, *, max_tokens=300):
 
     return content.strip()
 
-SYSTEM_PROMPT = ("Kamu adalah Asisten AI LMS Mandiri. Bantu pengguna dalam Bahasa Indonesia, jelaskan materi MS Office, alur kursus, dan langkah di platform ini. Gunakan informasi katalog yang diberikan untuk menjawab pertanyaan kursus dan rekomendasi belajar. Jika data tidak tersedia, arahkan pengguna membuka halaman Kursus atau hubungi admin dengan sopan.")
+SYSTEM_PROMPT = ("Kamu adalah Asisten AI TechNova. Bantu pengguna dalam Bahasa Indonesia, jelaskan materi MS Office, alur kursus, dan langkah di platform ini. Gunakan informasi katalog yang diberikan untuk menjawab pertanyaan kursus dan rekomendasi belajar. Jika data tidak tersedia, arahkan pengguna membuka halaman Kursus atau hubungi admin dengan sopan.")
 FALLBACK_AI_REPLY = 'Maaf, asisten AI sedang tidak dapat merespons. Coba lagi nanti'
 STUDENT_FEATURES_CONTEXT = (
     "Fitur role student mencakup: menjelajahi katalog kursus lengkap dengan filter materi, status premium, dan pencarian; "
