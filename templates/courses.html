@@ -97,7 +97,10 @@
                                                       data-certificate-type="{{ c.instructor.certificate_type or '' }}"
                                                       data-course-title="{{ c.title }}">
                                                 Profil Pengajar
-                                              </a>                              </div>
+                                              </a>                              
+                                            <!-- TOMBOL BARU DITAMBAHKAN DI SINI -->
+                                              <a href="{{ url_for('view_syllabus', course_id=c.id) }}" class="btn secondary">Lihat Silabus</a>
+                                            </div>
                             {% else %} {# Instructor View #}
                               <a class="btn" href="{{ url_for('course_detail', course_id=c.id) }}">Lihat Materi</a>
                             {% endif %}

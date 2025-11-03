@@ -446,3 +446,37 @@ ul{padding-left:18px}
     width: 100%;
   }
 }
+
+/* === STYLING HALAMAN SILABUS === */
+.syllabus-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-top: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.syllabus-section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.syllabus-list .list-group-item {
+  border-left: 0;
+  border-right: 0;
+  padding-left: 0;
+  font-size: 1rem;
+}
+
+.syllabus-icon {
+  font-size: 1.5rem;
+  width: 40px; /* Memberi ruang agar ikon tidak menempel */
+  text-align: center;
+}
+
+.syllabus-item-title {
+  font-weight: 500;
+}

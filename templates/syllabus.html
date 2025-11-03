@@ -1,0 +1,65 @@
+<!-- templates/syllabus.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Silabus untuk: {{ course.title }}</h2>
+  <p>{{ course.description }}</p>
+  <hr>
+
+  <!-- === AWAL BAGIAN SILABUS === -->
+  <div class="syllabus-container card">
+    <div class="card-header">
+      <h3 class="mb-0">Rincian Silabus</h3>
+    </div>
+    <div class="card-body">
+      <!-- Bagian Materi Pembelajaran -->
+      <h4 class="syllabus-section-title">Materi Pembelajaran</h4>
+      <ul class="list-group list-group-flush syllabus-list">
+        {% if lessons %}
+          {% for lesson in lessons %}
+            <li class="list-group-item d-flex align-items-center">
+              <span class="syllabus-icon mr-3">
+                {% if lesson.video_url %}
+                  &#x1F4F9; <!-- Ikon Video -->
+                {% elif lesson.meeting_url %}
+                  &#x1F4BB; <!-- Ikon Komputer/Meeting -->
+                {% else %}
+                  &#x1F4C4; <!-- Ikon Dokumen -->
+                {% endif %}
+              </span>
+              <div class="syllabus-item-title">{{ lesson.title }}</div>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="list-group-item">Belum ada materi pembelajaran.</li>
+        {% endif %}
+      </ul>
+
+      <!-- Bagian Evaluasi -->
+      <h4 class="syllabus-section-title mt-4">Evaluasi & Tugas</h4>
+      <ul class="list-group list-group-flush syllabus-list">
+        {% if questions %}
+          <li class="list-group-item d-flex align-items-center">
+            <span class="syllabus-icon mr-3">&#x2753;</span> <!-- Ikon Tanda Tanya untuk Kuis -->
+            <div class="syllabus-item-title">Kuis Akhir</div>
+          </li>
+        {% endif %}
+        {% if exercise %}
+          <li class="list-group-item d-flex align-items-center">
+            <span class="syllabus-icon mr-3">&#x1F4DD;</span> <!-- Ikon Pensil dan Kertas untuk Latihan -->
+            <div class="syllabus-item-title">{{ exercise.name or 'Latihan Praktik' }}</div>
+          </li>
+        {% endif %}
+        {% if not questions and not exercise %}
+          <li class="list-group-item">Belum ada evaluasi.</li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+  <!-- === AKHIR BAGIAN SILABUS === -->
+
+  <div class="mt-4">
+      <a href="{{ url_for('courses') }}" class="btn btn-secondary">Kembali ke Halaman Kursus</a>
+  </div>
+</div>
+{% endblock %}
