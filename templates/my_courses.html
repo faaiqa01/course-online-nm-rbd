@@ -72,6 +72,7 @@
             data-course-title="{{ course.title }}">
           Profil Pengajar
         </a>
+        <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
       </div>
     </div>
   {% endfor %}

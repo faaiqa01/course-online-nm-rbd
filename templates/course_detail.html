@@ -255,6 +255,7 @@
         <div class="card-actions">
             <a href="{{ url_for('login') }}" class="btn">Login</a>
             <a href="{{ url_for('register') }}" class="btn secondary">Daftar</a>
+            <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
         </div>
     {% else %}
         <p>Anda harus mendaftar di kursus ini untuk melihat kontennya.</p>
@@ -273,6 +274,7 @@
                   <button class="btn" type="submit">Daftar</button>
                 </form>
               {% endif %}
+              <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
             {% endif %}
         </div>
     {% endif %}

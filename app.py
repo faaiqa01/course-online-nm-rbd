@@ -171,6 +171,18 @@ STUDENT_FEATURES_CONTEXT = (
     "panduan langkah, tidak melakukan checkout otomatis atau tindakan yang memerlukan izin pengguna."
 )
 
+AUTH_FEATURES_CONTEXT = (
+    "Setiap pengguna dapat membuat akun baru melalui halaman Register dengan memasukkan nama, email unik, kata sandi, dan memilih peran student atau instructor. "
+    "Setelah registrasi, pengguna login lewat halaman Login memakai email dan kata sandi; halaman Forgot/Reset Password mengizinkan penggantian sandi dengan memasukkan email, kata sandi baru, dan konfirmasi ketika diperlukan; menu Logout mengakhiri sesi. "
+    "Halaman Profil dipakai untuk memperbarui nama serta email; instruktur juga dapat menambahkan keahlian, institusi, pengalaman mengajar, serta mengelola unggahan atau tautan sertifikat verifikasi."
+)
+
+PLATFORM_FEATURES_CONTEXT = (
+    "Halaman Tentang TechNova Academy merangkum visi, misi, dan gambaran singkat platform sebagai pusat pembelajaran digital. "
+    "Dashboard utama menampilkan ringkasan kursus aktif, progres belajar, dan pintasan menuju tugas atau materi terbaru sesuai peran pengguna. "
+    "Menu Lihat Kursus menampilkan katalog lengkap dengan pencarian, filter materi, dan status premium agar pengguna mudah menelusuri program yang tersedia."
+)
+
 def build_catalog_context() -> str:
     """Ambil ringkasan kursus untuk dimasukkan ke prompt AI."""
     try:
@@ -225,6 +237,8 @@ def build_chat_messages(user_message: str, *, user=None) -> list[dict]:
     system_message = SYSTEM_PROMPT
     if user_context:
         system_message += ' Informasi pengguna: ' + ' '.join(user_context)
+    system_message += ' Informasi platform: ' + PLATFORM_FEATURES_CONTEXT
+    system_message += ' Panduan akun: ' + AUTH_FEATURES_CONTEXT
     if getattr(user, 'role', None) == 'student':
         system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
 
@@ -1024,6 +1038,18 @@ def course_detail(course_id):
                            is_enrolled=is_enrolled, is_unlocked=is_unlocked, is_in_cart=is_in_cart, 
                            attempt=attempt, progress=progress, exercise=exercise, exercise_submission=exercise_submission, now=datetime.utcnow() + timedelta(hours=7))
 
+@app.route('/course/<int:course_id>/syllabus')
+def view_syllabus(course_id):
+    course = Course.query.get_or_404(course_id)
+    lessons = Lesson.query.filter_by(course_id=course_id).order_by(Lesson.id).all()
+    questions = Question.query.filter_by(course_id=course_id).all()
+    exercise = Exercise.query.filter_by(course_id=course_id).first()
+    
+    return render_template('syllabus.html', 
+                           course=course, 
+                           lessons=lessons, 
+                           questions=questions, 
+                           exercise=exercise)
 
 @app.route('/cart')
 @login_required
