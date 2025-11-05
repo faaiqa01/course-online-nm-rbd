@@ -43,15 +43,15 @@
           <input type="number" id="teaching_experience" name="teaching_experience" value="{{ current_user.teaching_experience or '' }}">
       </div>
     
-        <div id="certificate_management_section">      {% if current_user.certificate_data and current_user.certificate_type != 'default' %}
+    <div id="certificate_management_section">
+      {% if current_user.certificate_data and current_user.certificate_type != 'default' %}
         <div class="course-field">
           <label>Sertifikat Anda</label>
           <div style="display: flex; align-items: center; gap: 10px;">
             <a href="{{ url_for('static', filename=current_user.certificate_data) if current_user.certificate_type in ['pdf', 'image'] else current_user.certificate_data }}" target="_blank" class="btn secondary">Lihat Sertifikat</a>
-            <form method="post" action="{{ url_for('delete_instructor_certificate') }}" style="margin: 0;">
-              <button type="submit" class="btn danger">Hapus Sertifikat</button>
-            </form>
+            <button type="button" onclick="deleteCertificate()" class="btn danger">Hapus Sertifikat</button>
           </div>
+          <input type="hidden" name="certificate_type" value="{{ current_user.certificate_type }}">
         </div>
       {% else %}
         <div class="course-field">
@@ -73,35 +73,48 @@
           <label for="certificate_link">Link Sertifikat Eksternal</label>
           <input type="url" id="certificate_link" name="certificate_link" value="{{ current_user.certificate_data if current_user.certificate_type == 'link' else '' }}">
         </div>
-  
-        <script>
-          document.addEventListener('DOMContentLoaded', function() {
-            const certificateTypeSelect = document.getElementById('certificate_type');
-            const certificateFileUploadField = document.getElementById('certificate_file_upload_field');
-            const certificateLinkField = document.getElementById('certificate_link_field');
-  
-            function toggleCertificateFields() {
-              const selectedType = certificateTypeSelect.value;
-              certificateFileUploadField.style.display = 'none';
-              certificateLinkField.style.display = 'none';
-  
-              if (selectedType === 'pdf' || selectedType === 'image') {
-                certificateFileUploadField.style.display = 'block';
-              } else if (selectedType === 'link') {
-                certificateLinkField.style.display = 'block';
-              }
-            }
-  
-            certificateTypeSelect.addEventListener('change', toggleCertificateFields);
-            toggleCertificateFields(); // Call on load to set initial state
-          });
-        </script>
       {% endif %}
-    </div>  {% endif %}
+    </div>
+  {% endif %}
 
   <div class="button-group" style="margin-top: 25px;">
     <button type="submit" class="btn primary">Simpan</button>
     <a class="btn secondary" href="{{ url_for('index') }}">Batal</a>
   </div>
 </form>
+
+<script>
+  function deleteCertificate() {
+    if (confirm('Anda yakin ingin menghapus sertifikat?')) {
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = "{{ url_for('delete_instructor_certificate') }}";
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const certificateTypeSelect = document.getElementById('certificate_type');
+    if (certificateTypeSelect) {
+      const certificateFileUploadField = document.getElementById('certificate_file_upload_field');
+      const certificateLinkField = document.getElementById('certificate_link_field');
+
+      function toggleCertificateFields() {
+        const selectedType = certificateTypeSelect.value;
+        certificateFileUploadField.style.display = 'none';
+        certificateLinkField.style.display = 'none';
+
+        if (selectedType === 'pdf' || selectedType === 'image') {
+          certificateFileUploadField.style.display = 'block';
+        } else if (selectedType === 'link') {
+          certificateLinkField.style.display = 'block';
+        }
+      }
+
+      certificateTypeSelect.addEventListener('change', toggleCertificateFields);
+      toggleCertificateFields(); // Call on load to set initial state
+    }
+  });
+</script>
 {% endblock %}
