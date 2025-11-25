@@ -95,4 +95,38 @@
       sendButton.disabled = false;
     }
   });
+
+  // Clear chat history button handler
+  const clearBtn = document.getElementById('clear-chat-btn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      // Konfirmasi sebelum clear
+      if (!confirm('Yakin ingin menghapus semua riwayat chat? Tindakan ini tidak dapat dibatalkan.')) {
+        return;
+      }
+
+      clearBtn.disabled = true;
+      const originalText = clearBtn.textContent;
+      clearBtn.textContent = 'Menghapus...';
+
+      try {
+        const response = await fetch('/api/ai-chat/clear', {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          // Clear chat log di UI
+          log.innerHTML = '';
+          alert('Riwayat chat berhasil dihapus!');
+        } else {
+          alert('Gagal menghapus riwayat chat. Coba lagi.');
+        }
+      } catch (error) {
+        alert('Terjadi kesalahan. Coba lagi.');
+      } finally {
+        clearBtn.disabled = false;
+        clearBtn.textContent = originalText;
+      }
+    });
+  }
 })();

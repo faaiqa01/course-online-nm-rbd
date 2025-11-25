@@ -326,7 +326,7 @@ def build_catalog_context() -> str:
 
     return ' '.join(parts)
 
-def build_chat_messages(user_message: str, *, user=None) -> list[dict]:
+def build_chat_messages(user_message: str, *, user=None, include_history=True) -> list[dict]:
     """Siapkan payload percakapan untuk OpenRouter."""
     user_context = []
     if user:
@@ -347,10 +347,35 @@ def build_chat_messages(user_message: str, *, user=None) -> list[dict]:
     if catalog_context:
         system_message += ' Informasi katalog: ' + catalog_context
 
-    return [
-        {'role': 'system', 'content': system_message},
-        {'role': 'user', 'content': user_message.strip()},
-    ]
+    messages = [{'role': 'system', 'content': system_message}]
+    
+    # Load conversation history (10 chat terakhir untuk context)
+    if include_history and user:
+        try:
+            # Auto-expire: hanya load chat dalam 1 jam terakhir
+            one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+            
+            history = (
+                ChatHistory.query
+                .filter_by(user_id=user.id)
+                .filter(ChatHistory.created_at >= one_hour_ago)  # Filter: hanya chat <1 jam
+                .order_by(ChatHistory.created_at.desc())
+                .limit(10)
+                .all()
+            )
+            # Reverse agar urutan chronological (oldest first)
+            for chat in reversed(history):
+                messages.append({
+                    'role': chat.role,
+                    'content': chat.message
+                })
+        except Exception:
+            app.logger.exception('Gagal load chat history untuk user %s', user.id)
+    
+    # Tambahkan pertanyaan user saat ini
+    messages.append({'role': 'user', 'content': user_message.strip()})
+    
+    return messages
 
 
 
@@ -547,6 +572,21 @@ class CartItem(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
 
     __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_cart_user_course'),)
+
+class ChatHistory(db.Model):
+    """Model untuk menyimpan riwayat percakapan AI chatbot."""
+    __tablename__ = 'chat_history'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    role = db.Column(db.String(20), nullable=False)  # 'user' or 'assistant'
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    user = db.relationship('User', backref='chat_history')
+    
+    def __repr__(self):
+        return f'<ChatHistory {self.id} {self.role}>'
+
 
 
 
@@ -775,13 +815,55 @@ def api_ai_chat():
 
     app.logger.info('AI chat request user_id=%s role=%s len=%s', getattr(current_user, 'id', 'anon'), getattr(current_user, 'role', 'unknown'), len(user_message))
 
-    messages = build_chat_messages(user_message, user=current_user)
+    # Simpan pertanyaan user ke database
+    try:
+        user_chat = ChatHistory(
+            user_id=current_user.id,
+            role='user',
+            message=user_message
+        )
+        db.session.add(user_chat)
+        db.session.commit()
+    except Exception:
+        app.logger.exception('Gagal simpan user message ke chat history')
+        db.session.rollback()
+
+    # Build messages dengan conversation history
+    messages = build_chat_messages(user_message, user=current_user, include_history=True)
     ai_reply = call_openrouter(messages)
 
     if not ai_reply:
         return jsonify({'reply': FALLBACK_AI_REPLY})
 
+    # Simpan jawaban AI ke database
+    try:
+        ai_chat = ChatHistory(
+            user_id=current_user.id,
+            role='assistant',
+            message=ai_reply
+        )
+        db.session.add(ai_chat)
+        db.session.commit()
+    except Exception:
+        app.logger.exception('Gagal simpan AI reply ke chat history')
+        db.session.rollback()
+
     return jsonify({'reply': ai_reply})
+
+@app.route('/api/ai-chat/clear', methods=['DELETE'])
+@login_required
+def clear_chat_history():
+    """Hapus semua chat history user saat ini."""
+    try:
+        deleted = ChatHistory.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+        app.logger.info('Cleared %d chat history for user %s', deleted, current_user.id)
+        return jsonify({'success': True, 'deleted': deleted})
+    except Exception:
+        app.logger.exception('Failed to clear chat history for user %s', current_user.id)
+        db.session.rollback()
+        return jsonify({'error': 'Gagal menghapus riwayat chat'}), 500
+
 
 @app.route('/')
 def index():
