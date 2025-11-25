@@ -2,15 +2,47 @@
 
 {% block content %}
 <div class="ai-chat-page">
-  <h1>Asisten AI</h1>
-  <p class="ai-chat-description">Ajukan pertanyaan seputar kursus atau materi MS Office. Asisten akan merespons dalam Bahasa Indonesia.</p>
+  <div class="ai-chat-header">
+    <h1>Asisten AI</h1>
+    <button id="clear-chat-btn" class="btn-clear-chat" title="Hapus riwayat chat">
+      🗑️ Clear Chat
+    </button>
+  </div>
+
+  <p class="ai-chat-description">Ajukan pertanyaan seputar kursus atau materi MS Office. Asisten akan merespons dalam
+    Bahasa Indonesia.</p>
+
+  <!-- Info Box -->
+  <div class="ai-chat-info">
+    <div class="ai-chat-info-header">💡 Tips Penggunaan</div>
+    <ul class="ai-chat-info-list">
+      <li>AI dapat menjawab tentang <strong>semua kursus</strong> (harga, instruktur, materi)</li>
+      <li>AI <strong>ingat konteks</strong> percakapan (dalam 1 jam terakhir)</li>
+      <li>Klik <strong>"Clear Chat"</strong> untuk mulai percakapan baru</li>
+      <li>AI hanya memberikan <strong>panduan</strong>, tidak bisa melakukan aksi langsung</li>
+    </ul>
+  </div>
+
+  <!-- Suggested Questions -->
+  <div class="ai-chat-suggestions">
+    <div class="ai-chat-suggestions-title">Pertanyaan Umum:</div>
+    <div class="ai-chat-suggestions-buttons">
+      <button class="suggestion-btn" data-question="Kursus apa yang gratis?">Kursus apa yang gratis?</button>
+      <button class="suggestion-btn" data-question="Berapa harga kursus Excel Dasar?">Berapa harga kursus Excel
+        Dasar?</button>
+      <button class="suggestion-btn" data-question="Cara download sertifikat?">Cara download sertifikat?</button>
+      <button class="suggestion-btn" data-question="Kursus apa yang paling populer?">Kursus apa yang paling
+        populer?</button>
+    </div>
+  </div>
 
   <div class="ai-chat-panel">
     <div id="ai-chat-log" class="ai-chat-log" aria-live="polite"></div>
 
     <form id="ai-chat-form" class="ai-chat-form" autocomplete="off">
       <label for="ai-chat-input" class="sr-only">Pesan</label>
-      <textarea id="ai-chat-input" name="message" rows="3" maxlength="500" placeholder="Tulis pertanyaanmu di sini..." required></textarea>
+      <textarea id="ai-chat-input" name="message" rows="3" maxlength="500" placeholder="Tulis pertanyaanmu di sini..."
+        required></textarea>
       <div class="ai-chat-actions">
         <span id="ai-chat-status" class="ai-chat-status" role="status" aria-live="polite"></span>
         <button type="submit" class="ai-chat-send">Kirim</button>
@@ -19,5 +51,7 @@
   </div>
 </div>
 
+<!-- Marked.js library for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 <script src="{{ url_for('static', filename='js/ai_chat.js') }}"></script>
 {% endblock %}

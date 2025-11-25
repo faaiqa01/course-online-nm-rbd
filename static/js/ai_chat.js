@@ -1,4 +1,4 @@
-(function() {
+(function () {
   const form = document.getElementById('ai-chat-form');
   if (!form) {
     return;
@@ -22,7 +22,24 @@
 
     const bubble = document.createElement('div');
     bubble.className = 'ai-chat-bubble';
-    bubble.textContent = text;
+
+    // Render Markdown untuk bot, plain text untuk user
+    if (role === 'bot' && typeof marked !== 'undefined') {
+      // Configure marked untuk keamanan
+      marked.setOptions({
+        breaks: true,  // Convert line breaks to <br>
+        gfm: true,     // GitHub Flavored Markdown
+        headerIds: false,  // Disable header IDs untuk keamanan
+        mangle: false  // Disable email mangling
+      });
+
+      // Render Markdown jadi HTML
+      const htmlContent = marked.parse(text);
+      bubble.innerHTML = htmlContent;
+    } else {
+      // User message tetap plain text
+      bubble.textContent = text;
+    }
 
     wrapper.appendChild(bubble);
     log.appendChild(wrapper);
@@ -77,5 +94,53 @@
     if (sendButton) {
       sendButton.disabled = false;
     }
+  });
+
+  // Clear chat history button handler
+  const clearBtn = document.getElementById('clear-chat-btn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      // Konfirmasi sebelum clear
+      if (!confirm('Yakin ingin menghapus semua riwayat chat? Tindakan ini tidak dapat dibatalkan.')) {
+        return;
+      }
+
+      clearBtn.disabled = true;
+      const originalText = clearBtn.textContent;
+      clearBtn.textContent = 'Menghapus...';
+
+      try {
+        const response = await fetch('/api/ai-chat/clear', {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          // Clear chat log di UI
+          log.innerHTML = '';
+          alert('Riwayat chat berhasil dihapus!');
+        } else {
+          alert('Gagal menghapus riwayat chat. Coba lagi.');
+        }
+      } catch (error) {
+        alert('Terjadi kesalahan. Coba lagi.');
+      } finally {
+        clearBtn.disabled = false;
+        clearBtn.textContent = originalText;
+      }
+    });
+  }
+
+  // Suggested questions button handlers
+  const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+  suggestionBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const question = btn.getAttribute('data-question');
+      if (question && input) {
+        input.value = question;
+        input.focus();
+        // Optional: auto-submit
+        // form.dispatchEvent(new Event('submit'));
+      }
+    });
   });
 })();
