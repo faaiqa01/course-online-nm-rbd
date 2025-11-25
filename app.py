@@ -180,6 +180,17 @@ STUDENT_FEATURES_CONTEXT = (
     "hanya memberikan panduan langkah demi langkah. Selalu jelaskan bahwa user harus melakukan sendiri."
 )
 
+INSTRUCTOR_FEATURES_CONTEXT = (
+    "Fitur role instructor mencakup: membuat kursus baru dengan mengisi judul, deskripsi, status premium/gratis, harga (jika premium), "
+    "dan thumbnail; mengelola kursus yang sudah dibuat melalui halaman Dashboard Instruktur; menambahkan materi (lesson) ke kursus "
+    "dengan judul, konten teks, dan video URL (YouTube/Vimeo); membuat soal kuis multiple choice dengan 4 pilihan jawaban; "
+    "menandai jawaban yang benar untuk setiap soal; melihat daftar siswa yang terdaftar di kursus mereka; melihat statistik "
+    "kursus (jumlah siswa, jumlah materi); mengedit atau menghapus kursus, materi, dan soal kuis yang sudah dibuat. "
+    "PENTING: Asisten AI TIDAK BISA melakukan aksi apapun (buat kursus, tambah materi, hapus soal, dll) - "
+    "hanya memberikan panduan langkah demi langkah. Selalu jelaskan bahwa user harus melakukan sendiri melalui interface yang tersedia."
+)
+
+
 AUTH_FEATURES_CONTEXT = (
     "Setiap pengguna dapat membuat akun baru melalui halaman Register dengan memasukkan nama, email unik, kata sandi, dan memilih peran student atau instructor. "
     "Setelah registrasi, pengguna login lewat halaman Login memakai email dan kata sandi; halaman Forgot/Reset Password mengizinkan penggantian sandi dengan memasukkan email, kata sandi baru, dan konfirmasi ketika diperlukan; menu Logout mengakhiri sesi. "
@@ -326,6 +337,58 @@ def build_catalog_context() -> str:
 
     return ' '.join(parts)
 
+def build_instructor_context(instructor_id: int) -> str:
+    """Ambil ringkasan kursus yang dibuat oleh instructor untuk dimasukkan ke prompt AI."""
+    try:
+        # Query kursus yang dibuat oleh instructor ini
+        instructor_courses = (
+            db.session.query(
+                Course,
+                func.count(Enrollment.id).label('student_count'),
+                func.count(Lesson.id).label('lesson_count')
+            )
+            .outerjoin(Enrollment, Enrollment.course_id == Course.id)
+            .outerjoin(Lesson, Lesson.course_id == Course.id)
+            .filter(Course.instructor_id == instructor_id)
+            .group_by(Course.id)
+            .order_by(Course.title.asc())
+            .all()
+        )
+        
+        if not instructor_courses:
+            return "Anda belum membuat kursus apapun."
+        
+        parts = []
+        parts.append(f"Anda telah membuat {len(instructor_courses)} kursus:")
+        
+        course_details = []
+        for course, student_count, lesson_count in instructor_courses:
+            if not getattr(course, 'title', None):
+                continue
+            
+            # Format: "Judul (Status-Harga, X siswa, Y materi)"
+            detail_parts = []
+            
+            if course.is_premium:
+                price_str = f'Rp{course.price:,}' if course.price else 'Rp0'
+                detail_parts.append(f'Premium-{price_str}')
+            else:
+                detail_parts.append('Gratis')
+            
+            detail_parts.append(f'{student_count} siswa')
+            detail_parts.append(f'{lesson_count} materi')
+            
+            course_details.append(f"{course.title} ({', '.join(detail_parts)})")
+        
+        if course_details:
+            parts.append('; '.join(course_details) + '.')
+        
+        return ' '.join(parts)
+    
+    except Exception:
+        app.logger.exception('Gagal menyiapkan konteks instructor')
+        return ''
+
 def build_chat_messages(user_message: str, *, user=None, include_history=True) -> list[dict]:
     """Siapkan payload percakapan untuk OpenRouter."""
     user_context = []
@@ -340,12 +403,21 @@ def build_chat_messages(user_message: str, *, user=None, include_history=True) -
         system_message += ' Informasi pengguna: ' + ' '.join(user_context)
     system_message += ' Informasi platform: ' + PLATFORM_FEATURES_CONTEXT
     system_message += ' Panduan akun: ' + AUTH_FEATURES_CONTEXT
+    
+    # Role-specific features context
     if getattr(user, 'role', None) == 'student':
         system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
+        # Student: tampilkan katalog semua kursus
+        catalog_context = build_catalog_context()
+        if catalog_context:
+            system_message += ' Informasi katalog: ' + catalog_context
+    elif getattr(user, 'role', None) == 'instructor':
+        system_message += ' Panduan fitur instruktur: ' + INSTRUCTOR_FEATURES_CONTEXT
+        # Instructor: tampilkan kursus yang mereka buat
+        instructor_context = build_instructor_context(user.id)
+        if instructor_context:
+            system_message += ' Kursus Anda: ' + instructor_context
 
-    catalog_context = build_catalog_context()
-    if catalog_context:
-        system_message += ' Informasi katalog: ' + catalog_context
 
     messages = [{'role': 'system', 'content': system_message}]
     

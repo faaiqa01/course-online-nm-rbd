@@ -27,12 +27,25 @@
   <div class="ai-chat-suggestions">
     <div class="ai-chat-suggestions-title">Pertanyaan Umum:</div>
     <div class="ai-chat-suggestions-buttons">
+      {% if current_user.role == 'instructor' %}
+      <!-- Pertanyaan untuk Instructor -->
+      <button class="suggestion-btn" data-question="Bagaimana cara membuat kursus baru?">Bagaimana cara membuat kursus
+        baru?</button>
+      <button class="suggestion-btn" data-question="Bagaimana cara menambah materi ke kursus?">Bagaimana cara menambah
+        materi?</button>
+      <button class="suggestion-btn" data-question="Bagaimana cara melihat siswa yang terdaftar?">Bagaimana cara melihat
+        siswa?</button>
+      <button class="suggestion-btn" data-question="Bagaimana cara membuat soal kuis?">Bagaimana cara membuat
+        kuis?</button>
+      {% else %}
+      <!-- Pertanyaan untuk Student -->
       <button class="suggestion-btn" data-question="Kursus apa yang gratis?">Kursus apa yang gratis?</button>
       <button class="suggestion-btn" data-question="Berapa harga kursus Excel Dasar?">Berapa harga kursus Excel
         Dasar?</button>
       <button class="suggestion-btn" data-question="Cara download sertifikat?">Cara download sertifikat?</button>
       <button class="suggestion-btn" data-question="Kursus apa yang paling populer?">Kursus apa yang paling
         populer?</button>
+      {% endif %}
     </div>
   </div>
 
