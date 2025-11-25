@@ -111,60 +111,66 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
     ```
     Ini akan membuat database (jika belum ada) dan semua tabel sesuai dengan skema terakhir.
 
-### Konfigurasi Opsional: Asisten AI
 
-Aplikasi ini dilengkapi dengan **Asisten AI chatbot** yang terintegrasi dengan OpenRouter API untuk membantu pengguna dalam navigasi platform dan informasi kursus.
+### Konfigurasi Opsional: Asisten Chatbot
 
-#### Kemampuan Asisten AI
+Platform ini menyediakan fitur chatbot interaktif yang membantu pengguna mencari informasi kursus dan panduan penggunaan platform. Chatbot terintegrasi dengan OpenRouter API.
 
-Setelah upgrade terbaru, AI chatbot dapat:
+#### Fitur Chatbot
 
-1. **Informasi Lengkap Semua Kursus** (Opsi 3):
-   - Menjawab pertanyaan tentang **semua kursus** di database (harga, instruktur, status premium/gratis)
-   - Memberikan detail lengkap untuk kursus populer (deskripsi, jumlah materi, jumlah siswa)
-   - Contoh: "Berapa harga kursus Paket Office 2?" → AI akan jawab dengan harga yang benar
+Chatbot dapat membantu dengan:
 
-2. **Panduan Platform**:
-   - Menjelaskan cara enroll kursus, checkout, mengikuti kuis, download sertifikat
-   - Memberikan informasi tentang fitur-fitur platform
-   - Menjawab pertanyaan tentang akun (register, login, reset password)
+1. **Informasi Kursus**:
+   - Menjawab pertanyaan tentang harga, instruktur, dan status (gratis/premium) untuk semua kursus yang tersedia
+   - Memberikan detail lengkap untuk kursus populer seperti deskripsi, jumlah materi, dan jumlah siswa terdaftar
+   - Contoh: "Berapa harga kursus Paket Office 2?" akan dijawab dengan informasi harga yang akurat
 
-3. **Rekomendasi Kursus**:
+2. **Panduan Penggunaan**:
+   - Menjelaskan cara mendaftar kursus, melakukan checkout, mengikuti kuis, dan mengunduh sertifikat
+   - Memberikan informasi tentang fitur-fitur yang tersedia di platform
+   - Menjawab pertanyaan seputar akun seperti registrasi, login, dan reset password
+
+3. **Rekomendasi**:
    - Memberikan saran kursus berdasarkan minat pengguna
-   - Menampilkan kursus populer dan terbaru dengan data konkret
+   - Menampilkan kursus populer dan terbaru dengan data yang relevan
 
-4. **Gaya Komunikasi**:
-   - Jawaban ringkas dan relevan (tidak bertele-tele)
-   - Menyesuaikan panjang jawaban dengan kompleksitas pertanyaan
-   - Bahasa natural dan mudah dipahami
+4. **Fitur Tambahan**:
+   - **Riwayat Percakapan**: Chatbot mengingat konteks percakapan dalam 1 jam terakhir, sehingga pengguna tidak perlu mengulang informasi
+   - **Clear Chat**: Tombol untuk menghapus riwayat dan memulai percakapan baru
+   - **Suggested Questions**: Tombol pertanyaan umum yang bisa diklik langsung
+   - **Tips Penggunaan**: Info box yang menjelaskan kemampuan chatbot
 
-**Penting**: AI **tidak dapat melakukan aksi langsung** (enroll, checkout, reset password, dll) - hanya memberikan panduan langkah demi langkah. AI akan selalu menjelaskan bahwa pengguna harus melakukan aksi sendiri.
+**Catatan Penting**: Chatbot hanya memberikan informasi dan panduan. Untuk melakukan tindakan seperti mendaftar kursus atau checkout, pengguna tetap harus melakukannya sendiri melalui interface yang tersedia.
 
-#### Konfigurasi AI
+#### Cara Mengaktifkan
 
-Untuk mengaktifkan chatbot:
+Untuk mengaktifkan chatbot, ikuti langkah berikut:
 
-1. Pastikan Anda memiliki akun dan API key OpenRouter (atau penyedia lain yang kompatibel dengan format OpenAI API).
-2. Isi variabel berikut di `.env`:
-    - `AI_PROVIDER=openrouter`
-    - `AI_API_KEY=<API_KEY_ANDA>`
-    - `AI_MODEL=google/gemma-3-27b-it:free` (atau model lain yang tersedia)
-    - `AI_BASE_URL=https://openrouter.ai/api/v1/chat/completions` (default, boleh dikosongkan jika sama)
-    - `APP_BASE_URL` opsional untuk header referer.
-3. Jika variabel tidak diisi atau provider bukan `openrouter`, tombol Asisten AI tetap ada tetapi akan memberi pesan fallback.
+1. Daftar akun di OpenRouter (atau penyedia API lain yang kompatibel dengan format OpenAI)
+2. Tambahkan konfigurasi berikut di file `.env`:
+   ```
+   AI_PROVIDER=openrouter
+   AI_API_KEY=<API_KEY_ANDA>
+   AI_MODEL=google/gemma-3-27b-it:free
+   AI_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+   APP_BASE_URL=http://localhost:5000
+   ```
+3. Jika konfigurasi tidak lengkap, tombol chatbot tetap muncul tapi akan menampilkan pesan fallback
 
-#### Model AI yang Direkomendasikan
+#### Model yang Disarankan
 
-- **Google Gemma 3 27B Instruct (free)**: Model gratis yang cukup powerful untuk chatbot LMS
-- **OpenRouter Auto**: Otomatis memilih model terbaik yang tersedia
+- **Google Gemma 3 27B Instruct (free)**: Model gratis yang cukup baik untuk kebutuhan chatbot LMS
+- **OpenRouter Auto**: Memilih model terbaik secara otomatis (mungkin berbayar)
 
-#### Teknis AI
+#### Detail Teknis
 
-- **Context Injection**: AI mengakses database melalui context yang disiapkan backend, bukan query langsung
-- **Max Tokens**: 600 token per response (cukup untuk jawaban detail tanpa kepotong)
-- **Logging**: Semua aktivitas AI dicatat di `logs/app.log` dengan rotasi otomatis
+- Chatbot mengakses data kursus melalui backend, bukan langsung ke database
+- Maksimal 600 token per respons untuk memastikan jawaban lengkap
+- Riwayat chat otomatis expire setelah 1 jam untuk menjaga privasi
+- Semua aktivitas tercatat di `logs/app.log` dengan rotasi otomatis
 
-> Catatan: File log chatbot disimpan di direktori `logs/app.log` dengan rotasi otomatis (`RotatingFileHandler`).
+> Log chatbot tersimpan di `logs/app.log` dengan sistem rotasi file otomatis.
+
 
 ## Menjalankan Aplikasi
 

@@ -129,4 +129,18 @@
       }
     });
   }
+
+  // Suggested questions button handlers
+  const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+  suggestionBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const question = btn.getAttribute('data-question');
+      if (question && input) {
+        input.value = question;
+        input.focus();
+        // Optional: auto-submit
+        // form.dispatchEvent(new Event('submit'));
+      }
+    });
+  });
 })();
