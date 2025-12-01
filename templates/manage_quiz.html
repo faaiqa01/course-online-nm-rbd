@@ -3,7 +3,7 @@
 <h2>Quiz Details - {{ course.title }}</h2>
 <div class="card-actions">
   <a class="btn secondary" href="{{ url_for('course_detail', course_id=course.id) }}">Back</a>
-  <a class="btn" href="{{ url_for('manage_quiz_dates', course_id=course.id) }}">Atur Tanggal Kuis</a>
+  <a class="btn" href="{{ url_for('manage_quiz_dates', course_id=course.id) }}">Atur Kuis</a>
   <a class="btn" href="{{ url_for('add_question', course_id=course.id) }}">Add Question</a>
 </div>
 {% if questions %}

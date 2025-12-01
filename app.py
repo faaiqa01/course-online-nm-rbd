@@ -603,6 +603,8 @@ class Course(db.Model):
     material_type = db.Column(db.String(100), nullable=True) # Jenis Materi
     quiz_start_date = db.Column(db.DateTime, nullable=True)
     quiz_end_date = db.Column(db.DateTime, nullable=True)
+    passing_grade = db.Column(db.Integer, default=100)  # Passing grade for quiz (default 100)
+    attempt_limit = db.Column(db.Integer, default=0)  # 0 = unlimited attempts
 
 class Lesson(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1268,6 +1270,12 @@ def course_detail(course_id):
                 completed_ids = {record.lesson_id for record in completed_records}
                 completed_count = len(completed_ids)
         attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
+    
+    # Count total attempts for this user on this course
+    attempt_count = 0
+    if current_user.is_authenticated and current_user.role == 'student':
+        attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
+    
     for lesson in lessons:
         if lesson.id in completed_ids:
             lesson.is_completed = True
@@ -1290,7 +1298,8 @@ def course_detail(course_id):
         total_components += 1
         if is_enrolled and attempt:
             quiz_score = attempt.score
-            if attempt.score == 100:
+            passing_grade = c.passing_grade if c.passing_grade else 100
+            if attempt.score >= passing_grade:
                 completed_components += 1
                 quiz_status = 'complete'
             else:
@@ -1322,7 +1331,7 @@ def course_detail(course_id):
         'quiz': {
             'attempted': (attempt is not None) if is_enrolled else False,
             'score': quiz_score if is_enrolled else 0,
-            'target': 100,
+            'target': c.passing_grade if c.passing_grade else 100,
             'status': quiz_status if is_enrolled else 'not_attempted'
         },
         'exercise': {
@@ -1346,7 +1355,7 @@ def course_detail(course_id):
     
     return render_template('course_detail.html', course=c, lessons=lessons, questions=questions,
                            is_enrolled=is_enrolled, is_unlocked=is_unlocked, is_in_cart=is_in_cart, 
-                           attempt=attempt, progress=progress, certificate_progress=certificate_progress,
+                           attempt=attempt, attempt_count=attempt_count, progress=progress, certificate_progress=certificate_progress,
                            exercise=exercise, exercise_submission=exercise_submission, 
                            now=datetime.utcnow() + timedelta(hours=7))
 
@@ -2161,6 +2170,12 @@ def manage_quiz_dates(course_id):
         quiz_end_date_str = request.form.get('quiz_end_date')
 
 
+        passing_grade = request.form.get('passing_grade')
+
+
+        attempt_limit = request.form.get('attempt_limit')
+
+
 
 
 
@@ -2170,6 +2185,12 @@ def manage_quiz_dates(course_id):
 
 
         course.quiz_end_date = datetime.strptime(quiz_end_date_str, '%Y-%m-%dT%H:%M') if quiz_end_date_str else None
+
+
+        course.passing_grade = int(passing_grade) if passing_grade and passing_grade.strip() else 100
+
+
+        course.attempt_limit = int(attempt_limit) if attempt_limit and attempt_limit.strip() else 0
 
 
 
@@ -2269,17 +2290,23 @@ def take_quiz(course_id):
         flash('Enroll and unlock first', 'error')
         return redirect(url_for('course_detail', course_id=course_id))
     qs = Question.query.filter_by(course_id=course_id).all()
-    latest_attempt = None
+    
+    # Check attempt limit
     if current_user.role == 'student':
-        latest_attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
-        if latest_attempt and request.method == 'GET':
-            flash('Anda sudah menyelesaikan kuis ini. Kuis hanya dapat dikerjakan satu kali.', 'error')
+        attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
+        # If attempt_limit > 0 (not unlimited) and user has reached the limit
+        if c.attempt_limit > 0 and attempt_count >= c.attempt_limit:
+            flash(f'Anda sudah mencapai batas maksimal percobaan ({c.attempt_limit}x).', 'error')
             return redirect(url_for('course_detail', course_id=course_id))
 
     if request.method == 'POST':
-        if current_user.role == 'student' and latest_attempt:
-            flash('Kuis hanya dapat dikirim satu kali.', 'error')
-            return redirect(url_for('course_detail', course_id=course_id))
+        # Double check on POST
+        if current_user.role == 'student':
+            attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
+            if c.attempt_limit > 0 and attempt_count >= c.attempt_limit:
+                flash(f'Anda sudah mencapai batas maksimal percobaan ({c.attempt_limit}x).', 'error')
+                return redirect(url_for('course_detail', course_id=course_id))
+        
         correct = 0
         total = len(qs)
         for q in qs:
@@ -2290,7 +2317,9 @@ def take_quiz(course_id):
             if ch and ch.is_correct:
                 correct += 1
         score = int((correct/total)*100) if total else 0
-        passed = score >= 60
+        # Use dynamic passing_grade instead of hardcoded 60
+        passing_grade = c.passing_grade if c.passing_grade else 100
+        passed = score >= passing_grade
         att = Attempt(user_id=current_user.id, course_id=course_id, score=score, passed=passed)
         db.session.add(att)
         db.session.commit()
@@ -2328,8 +2357,9 @@ def download_certificate(course_id):
         flash('Tidak ada latihan yang ditentukan untuk kursus ini, sehingga penyelesaian latihan tidak diperlukan untuk sertifikat.', 'info')
 
     attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
-    if not attempt or attempt.score < 100:
-        flash('Dapatkan skor 100 pada kuis terlebih dahulu sebelum mengunduh sertifikat.', 'error')
+    passing_grade = course.passing_grade if course.passing_grade else 100
+    if not attempt or attempt.score < passing_grade:
+        flash(f'Dapatkan skor minimal {passing_grade} pada kuis terlebih dahulu sebelum mengunduh sertifikat.', 'error')
         return redirect(url_for('course_detail', course_id=course_id))
 
     # Check for all lessons completed

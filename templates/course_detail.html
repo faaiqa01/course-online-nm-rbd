@@ -120,12 +120,12 @@
   {# End Certificate Progress Card #}
   {# Download Certificate Button #}
   <div style="text-align: center; margin-top: 1rem;">
-  {% if attempt and attempt.score == 100 %}
+  {% if attempt and attempt.score >= (course.passing_grade if course.passing_grade else 100) %}
   <form method="get" action="{{ url_for('download_certificate', course_id=course.id) }}" style="display: inline-block;">
     <button class="btn secondary" type="submit" title="Download sertifikat">Download Sertifikat</button>
   </form>
   {% else %}
-  <button class="btn secondary" type="button" disabled title="Capai skor 100 untuk unduh sertifikat">Download
+  <button class="btn secondary" type="button" disabled title="Capai passing grade ({{ course.passing_grade if course.passing_grade else 100 }}) untuk unduh sertifikat">Download
     Sertifikat</button>
   {% endif %}
   </div>
@@ -141,7 +141,7 @@
 {% else %}
 <p class="progress-note">Klik tombol Daftar untuk bergabung ke course.</p>
 {% endif %}
-{% elif attempt and attempt.score < 100 %} <p class="progress-note">Capai skor 100 pada kuis untuk mengunduh sertifikat.
+{% elif attempt and attempt.score < (course.passing_grade if course.passing_grade else 100) %} <p class="progress-note">Capai passing grade ({{ course.passing_grade if course.passing_grade else 100 }}) pada kuis untuk mengunduh sertifikat.
   </p>
   {% endif %}
   {% endif %}
@@ -234,9 +234,21 @@
       {% if course.quiz_end_date %}
       <p><strong>Kuis ditutup pada:</strong> {{ course.quiz_end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
       {% endif %}
-      {% if current_user.is_authenticated and current_user.role == 'student' and attempt %}
-      <p><strong>Anda sudah mengerjakan kuis ini. Kuis hanya dapat dikerjakan satu kali.</strong></p>
+      {% if course.passing_grade %}
+      <p><strong>Passing Grade:</strong> {{ course.passing_grade }}</p>
+      {% endif %}
+      {% if course.attempt_limit > 0 %}
+      <p><strong>Limit Percobaan:</strong> {{ attempt_count }}/{{ course.attempt_limit }}</p>
+      {% else %}
+      <p><strong>Limit Percobaan:</strong> Unlimited{% if attempt_count > 0 %} (sudah {{ attempt_count }}x){% endif %}</p>
+      {% endif %}
+      {% if current_user.is_authenticated and current_user.role == 'student' %}
+        {% if course.attempt_limit > 0 and attempt_count >= course.attempt_limit %}
+      <p><strong>Anda sudah mencapai batas maksimal percobaan.</strong></p>
       <button class="btn" disabled>Mulai Kuis</button>
+        {% else %}
+      <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
+        {% endif %}
       {% else %}
       <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
       {% endif %}
