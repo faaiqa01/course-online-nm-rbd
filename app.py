@@ -2291,13 +2291,17 @@ def take_quiz(course_id):
         return redirect(url_for('course_detail', course_id=course_id))
     qs = Question.query.filter_by(course_id=course_id).all()
     
-    # Check attempt limit
+    # Check attempt limit and calculate remaining attempts
+    attempt_count = 0
+    remaining_attempts = 0
     if current_user.role == 'student':
         attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
         # If attempt_limit > 0 (not unlimited) and user has reached the limit
-        if c.attempt_limit > 0 and attempt_count >= c.attempt_limit:
-            flash(f'Anda sudah mencapai batas maksimal percobaan ({c.attempt_limit}x).', 'error')
-            return redirect(url_for('course_detail', course_id=course_id))
+        if c.attempt_limit > 0:
+            remaining_attempts = c.attempt_limit - attempt_count
+            if attempt_count >= c.attempt_limit:
+                flash(f'Anda sudah mencapai batas maksimal percobaan ({c.attempt_limit}x).', 'error')
+                return redirect(url_for('course_detail', course_id=course_id))
 
     if request.method == 'POST':
         # Double check on POST
@@ -2330,7 +2334,7 @@ def take_quiz(course_id):
     for q in qs:
         choices = Choice.query.filter_by(question_id=q.id).all()
         data.append({'id': q.id, 'text': q.text, 'choices': choices})
-    return render_template('quiz.html', course=c, questions=data)
+    return render_template('quiz.html', course=c, questions=data, remaining_attempts=remaining_attempts)
 
 @app.route('/course/<int:course_id>/certificate/download')
 @login_required
