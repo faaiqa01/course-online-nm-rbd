@@ -206,7 +206,7 @@ Untuk membuat aplikasi lokal Anda dapat diakses dari internet (misalnya untuk de
 3.  Jalankan perintah:
     ```bash
 
-    ./ngrok.exe http 3000
+    ./ngrok.exe http 5000
 
     ```
 4.  Ngrok akan memberikan URL publik yang bisa Anda gunakan.

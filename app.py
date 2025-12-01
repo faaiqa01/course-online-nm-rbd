@@ -1262,26 +1262,66 @@ def course_detail(course_id):
     completed_components = 0
 
     # Component 1: Lessons
+    lessons_status = 'incomplete'
     if lessons:
         total_components += 1
         if is_enrolled and completed_count == len(lessons):
             completed_components += 1
+            lessons_status = 'complete'
 
     # Component 2: Quiz
+    quiz_status = 'not_attempted'
+    quiz_score = 0
     if questions: # If there are any questions, a quiz exists
         total_components += 1
-        if is_enrolled and attempt and attempt.score == 100:
-            completed_components += 1
+        if is_enrolled and attempt:
+            quiz_score = attempt.score
+            if attempt.score == 100:
+                completed_components += 1
+                quiz_status = 'complete'
+            else:
+                quiz_status = 'incomplete'
 
     # Component 3: Exercise
-    # exercise is already fetched: exercise = Exercise.query.filter_by(course_id=course_id).first()
+    exercise_status = 'not_required'
+    exercise_score = 0
     if exercise:
         total_components += 1
-        # exercise_submission is already fetched: exercise_submission = ExerciseSubmission.query.filter_by(user_id=current_user.id, course_id=course_id).first()
-        if is_enrolled and exercise_submission and exercise_submission.score is not None: # Assuming score is set upon submission/grading
-            completed_components += 1
+        exercise_status = 'not_submitted'
+        if is_enrolled and exercise_submission:
+            exercise_score = exercise_submission.score if exercise_submission.score else 0
+            if exercise_submission.score is not None and exercise_submission.score > 0:
+                completed_components += 1
+                exercise_status = 'complete'
+            else:
+                exercise_status = 'pending'
 
     percent = int((completed_components / total_components) * 100) if total_components else 0
+    
+    # Build certificate progress data
+    certificate_progress = {
+        'lessons': {
+            'completed': completed_count if is_enrolled else 0,
+            'total': len(lessons),
+            'status': lessons_status if is_enrolled else 'incomplete'
+        },
+        'quiz': {
+            'attempted': (attempt is not None) if is_enrolled else False,
+            'score': quiz_score if is_enrolled else 0,
+            'target': 100,
+            'status': quiz_status if is_enrolled else 'not_attempted'
+        },
+        'exercise': {
+            'required': exercise is not None,
+            'submitted': (exercise_submission is not None) if is_enrolled else False,
+            'score': exercise_score if is_enrolled else 0,
+            'status': exercise_status if is_enrolled else 'not_required'
+        },
+        'total_components': total_components,
+        'completed_components': completed_components if is_enrolled else 0,
+        'percentage': percent if is_enrolled else 0
+    }
+    
     progress = {
         'completed': completed_components if is_enrolled else 0,
         'total': total_components,
@@ -1291,7 +1331,8 @@ def course_detail(course_id):
     }
     return render_template('course_detail.html', course=c, lessons=lessons, questions=questions,
                            is_enrolled=is_enrolled, is_unlocked=is_unlocked, is_in_cart=is_in_cart, 
-                           attempt=attempt, progress=progress, exercise=exercise, exercise_submission=exercise_submission, now=datetime.utcnow() + timedelta(hours=7))
+                           attempt=attempt, progress=progress, certificate_progress=certificate_progress,
+                           exercise=exercise, exercise_submission=exercise_submission, now=datetime.utcnow() + timedelta(hours=7))
 
 @app.route('/course/<int:course_id>/syllabus')
 def view_syllabus(course_id):
