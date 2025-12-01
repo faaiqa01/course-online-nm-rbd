@@ -68,6 +68,27 @@
     <button type="button" class="btn secondary" onclick="addOutcome()" style="margin-top: 0.5rem;">+ Tambah Outcome</button>
     <small class="thumbnail-hint">Tambahkan poin-poin apa yang akan dipelajari pada materi ini.</small>
   </div>
+
+  <div class="course-field">
+    <label>Keterampilan yang akan Anda peroleh</label>
+    <div id="skills-container">
+      {% if existing_skills %}
+        {% for skill in existing_skills %}
+      <div class="skill-item">
+        <input type="text" name="skills[]" value="{{ skill.skill_text }}" placeholder="Tulis keterampilan yang diperoleh" class="skill-input">
+        <button type="button" class="btn-remove-skill" onclick="removeSkill(this)">✕</button>
+      </div>
+        {% endfor %}
+      {% else %}
+      <div class="skill-item">
+        <input type="text" name="skills[]" placeholder="Contoh: Pemrograman Python Dasar" class="skill-input">
+        <button type="button" class="btn-remove-skill" onclick="removeSkill(this)" style="display:none;">✕</button>
+      </div>
+      {% endif %}
+    </div>
+    <button type="button" class="btn secondary" onclick="addSkill()" style="margin-top: 0.5rem;">+ Tambah Keterampilan</button>
+    <small class="thumbnail-hint">Tambahkan keterampilan spesifik yang akan dikuasai siswa.</small>
+  </div>
 </form>
 <div class="card-actions">
   <button class="btn" type="submit" form="lesson-form">Simpan</button>
@@ -100,6 +121,7 @@
     categorySelect.addEventListener('change', toggleFields);
     toggleFields(); // Initial call to set the correct fields on page load
     updateRemoveButtons(); // Initialize outcome buttons
+    updateSkillRemoveButtons(); // Initialize skill buttons
   });
 
   // Learning Outcomes functionality
@@ -127,6 +149,37 @@
     const items = document.querySelectorAll('.outcome-item');
     items.forEach((item, index) => {
       const btn = item.querySelector('.btn-remove-outcome');
+      if (btn) {
+        btn.style.display = items.length > 1 ? 'inline-block' : 'none';
+      }
+    });
+  }
+
+  // Skills functionality
+  function addSkill() {
+    const container = document.getElementById('skills-container');
+    const newItem = document.createElement('div');
+    newItem.className = 'skill-item';
+    newItem.innerHTML = `
+      <input type="text" name="skills[]" placeholder="Tulis keterampilan yang diperoleh" class="skill-input">
+      <button type="button" class="btn-remove-skill" onclick="removeSkill(this)">✕</button>
+    `;
+    container.appendChild(newItem);
+    updateSkillRemoveButtons();
+  }
+
+  function removeSkill(btn) {
+    const item = btn.closest('.skill-item');
+    if (item) {
+      item.remove();
+      updateSkillRemoveButtons();
+    }
+  }
+
+  function updateSkillRemoveButtons() {
+    const items = document.querySelectorAll('.skill-item');
+    items.forEach((item, index) => {
+      const btn = item.querySelector('.btn-remove-skill');
       if (btn) {
         btn.style.display = items.length > 1 ? 'inline-block' : 'none';
       }

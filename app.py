@@ -697,6 +697,13 @@ class LearningOutcome(db.Model):
     order_index = db.Column(db.Integer, default=0)
 
 
+class Skill(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
+    skill_text = db.Column(db.String(500), nullable=False)
+    order_index = db.Column(db.Integer, default=0)
+
+
 def ensure_course_thumbnail_column():
     try:
         inspector = inspect(db.engine)
@@ -1350,18 +1357,23 @@ def view_syllabus(course_id):
     questions = Question.query.filter_by(course_id=course_id).all()
     exercise = Exercise.query.filter_by(course_id=course_id).first()
     
-    # Get learning outcomes for each lesson
+    # Get learning outcomes and skills for each lesson
     lesson_outcomes = {}
+    lesson_skills = {}
     for lesson in lessons:
         outcomes = LearningOutcome.query.filter_by(lesson_id=lesson.id).order_by(LearningOutcome.order_index).all()
         lesson_outcomes[lesson.id] = outcomes
+        
+        skills = Skill.query.filter_by(lesson_id=lesson.id).order_by(Skill.order_index).all()
+        lesson_skills[lesson.id] = skills
     
     return render_template('syllabus.html', 
                            course=course, 
                            lessons=lessons, 
                            questions=questions, 
                            exercise=exercise,
-                           lesson_outcomes=lesson_outcomes)
+                           lesson_outcomes=lesson_outcomes,
+                           lesson_skills=lesson_skills)
 
 @app.route('/cart')
 @login_required
@@ -1755,6 +1767,18 @@ def create_lesson(course_id):
                     order_index=idx
                 )
                 db.session.add(outcome)
+        
+        # Save skills
+        skills = request.form.getlist('skills[]')
+        for idx, skill_text in enumerate(skills, start=1):
+            if skill_text and skill_text.strip():
+                skill = Skill(
+                    lesson_id=l.id,
+                    skill_text=skill_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(skill)
+        
         db.session.commit()
         
         flash('Lesson added', 'success')
@@ -1801,14 +1825,27 @@ def edit_lesson(course_id, lesson_id):
                     order_index=idx
                 )
                 db.session.add(outcome)
+        
+        # Update skills - delete old ones and create new ones
+        Skill.query.filter_by(lesson_id=lesson_id).delete()
+        skills = request.form.getlist('skills[]')
+        for idx, skill_text in enumerate(skills, start=1):
+            if skill_text and skill_text.strip():
+                skill = Skill(
+                    lesson_id=lesson_id,
+                    skill_text=skill_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(skill)
 
         db.session.commit()
         flash('Lesson updated', 'success')
         return redirect(url_for('course_detail', course_id=course_id))
     
-    # Load existing outcomes for edit mode
+    # Load existing outcomes and skills for edit mode
     existing_outcomes = LearningOutcome.query.filter_by(lesson_id=lesson_id).order_by(LearningOutcome.order_index).all()
-    return render_template('create_lesson.html', course=course, lesson=lesson, existing_outcomes=existing_outcomes)
+    existing_skills = Skill.query.filter_by(lesson_id=lesson_id).order_by(Skill.order_index).all()
+    return render_template('create_lesson.html', course=course, lesson=lesson, existing_outcomes=existing_outcomes, existing_skills=existing_skills)
 
 
 @app.route('/course/<int:course_id>/lesson/<int:lesson_id>/delete', methods=['POST'])

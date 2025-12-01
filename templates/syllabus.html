@@ -38,10 +38,25 @@
               
               {% if lesson_outcomes.get(lesson.id) %}
               <div class="lesson-outcomes-section">
-                <p class="outcomes-label">Yang akan dipelajari:</p>
-                <ul class="lesson-outcomes-list">
+                <p class="outcomes-label collapsible-label" onclick="toggleCollapse('outcomes-{{ lesson.id }}')">
+                  <span class="collapse-icon" id="icon-outcomes-{{ lesson.id }}">▶</span> Yang akan dipelajari:
+                </p>
+                <ul class="lesson-outcomes-list collapse-content" id="outcomes-{{ lesson.id }}" style="display: none;">
                   {% for outcome in lesson_outcomes[lesson.id] %}
                   <li>{{ outcome.outcome_text }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+              
+              {% if lesson_skills.get(lesson.id) %}
+              <div class="lesson-skills-section">
+                <p class="skills-label collapsible-label" onclick="toggleCollapse('skills-{{ lesson.id }}')">
+                  <span class="collapse-icon" id="icon-skills-{{ lesson.id }}">▶</span> Keterampilan yang akan Anda peroleh:
+                </p>
+                <ul class="lesson-skills-list collapse-content" id="skills-{{ lesson.id }}" style="display: none;">
+                  {% for skill in lesson_skills[lesson.id] %}
+                  <li>{{ skill.skill_text }}</li>
                   {% endfor %}
                 </ul>
               </div>
@@ -80,4 +95,19 @@
       <a href="{{ url_for('courses') }}" class="btn btn-secondary">Kembali ke Halaman Kursus</a>
   </div>
 </div>
+
+<script>
+function toggleCollapse(id) {
+  const content = document.getElementById(id);
+  const icon = document.getElementById('icon-' + id);
+  
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    icon.textContent = '▼';
+  } else {
+    content.style.display = 'none';
+    icon.textContent = '▶';
+  }
+}
+</script>
 {% endblock %}

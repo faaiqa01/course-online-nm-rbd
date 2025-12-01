@@ -2142,6 +2142,53 @@ ul {
   outline-offset: 2px;
 }
 
+/* Skill Item Styles - consistent with outcome styles */
+.skill-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.skill-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.skill-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-remove-skill {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-remove-skill:hover {
+  background: #dc2626;
+}
+
+.btn-remove-skill:focus {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
 /* Lesson Outcomes in Syllabus */
 .lesson-outcomes-section {
   margin-top: 12px;
@@ -2154,6 +2201,27 @@ ul {
   color: #1f2937;
   margin-bottom: 8px;
   margin-top: 12px;
+}
+
+.collapsible-label {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.collapsible-label:hover {
+  color: #3b82f6;
+}
+
+.collapse-icon {
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 0.75rem;
+  margin-right: 4px;
+}
+
+.collapse-content {
+  transition: all 0.3s ease;
 }
 
 .lesson-outcomes-section {
@@ -2193,4 +2261,50 @@ ul {
   font-size: 0.85rem;
   font-weight: normal;
   margin-left: 8px;
+}
+
+/* Lesson skills section - similar to outcomes */
+.lesson-skills-section {
+  margin-top: 12px;
+  padding-left: 40px;
+}
+
+.skills-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.skills-label:hover {
+  color: #3b82f6;
+}
+
+.lesson-skills-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lesson-skills-list li {
+  padding: 6px 0;
+  padding-left: 24px;
+  position: relative;
+  font-size: 0.9rem;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.lesson-skills-list li::before {
+  content: "◆";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  font-weight: bold;
+  color: #3b82f6;
+  font-size: 0.9rem;
 }
