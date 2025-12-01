@@ -17,17 +17,35 @@
       <ul class="list-group list-group-flush syllabus-list">
         {% if lessons %}
           {% for lesson in lessons %}
-            <li class="list-group-item d-flex align-items-center">
-              <span class="syllabus-icon mr-3">
-                {% if lesson.video_url %}
-                  &#x1F4F9; <!-- Ikon Video -->
-                {% elif lesson.meeting_url %}
-                  &#x1F4BB; <!-- Ikon Komputer/Meeting -->
-                {% else %}
-                  &#x1F4C4; <!-- Ikon Dokumen -->
-                {% endif %}
-              </span>
-              <div class="syllabus-item-title">{{ lesson.title }}</div>
+            <li class="list-group-item">
+              <div class="d-flex align-items-center">
+                <span class="syllabus-icon mr-3">
+                  {% if lesson.video_url %}
+                    &#x1F4F9; <!-- Ikon Video -->
+                  {% elif lesson.meeting_url %}
+                    &#x1F4BB; <!-- Ikon Komputer/Meeting -->
+                  {% else %}
+                    &#x1F4C4; <!-- Ikon Dokumen -->
+                  {% endif %}
+                </span>
+                <div class="syllabus-item-title">
+                  <strong>{{ lesson.title }}</strong>
+                  {% if lesson.duration_minutes %}
+                  <span class="lesson-duration">| {% if lesson.duration_minutes < 60 %}{{ lesson.duration_minutes }} menit{% else %}{{ "%.1f"|format(lesson.duration_minutes / 60) }} jam{% endif %}</span>
+                  {% endif %}
+                </div>
+              </div>
+              
+              {% if lesson_outcomes.get(lesson.id) %}
+              <div class="lesson-outcomes-section">
+                <p class="outcomes-label">Yang akan dipelajari:</p>
+                <ul class="lesson-outcomes-list">
+                  {% for outcome in lesson_outcomes[lesson.id] %}
+                  <li>{{ outcome.outcome_text }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
             </li>
           {% endfor %}
         {% else %}

@@ -164,7 +164,7 @@
           <a class="btn secondary small lesson-edit-btn"
             href="{{ url_for('edit_lesson', course_id=course.id, lesson_id=l.id) }}">Edit Materi</a>
           {% endif %}
-          <h4>{{ l.title }}</h4>
+          <h4>{{ l.title }}{% if l.duration_minutes %} <span class="lesson-duration">| {% if l.duration_minutes < 60 %}{{ l.duration_minutes }} menit{% else %}{{ "%.1f"|format(l.duration_minutes / 60) }} jam{% endif %}</span>{% endif %}</h4>
           <p>{{ l.content }}</p>
 
           {% if l.meeting_url %}

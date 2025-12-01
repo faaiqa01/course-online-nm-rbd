@@ -2048,3 +2048,149 @@ ul {
   font-size: 1.1rem;
   flex-shrink: 0;
 }
+
+/* Learning Outcomes Styles */
+.learning-outcomes-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  border: none;
+}
+
+.learning-outcomes-card h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.outcomes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.outcomes-list li {
+  padding: 12px 0;
+  padding-left: 32px;
+  position: relative;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.outcomes-list li:last-child {
+  border-bottom: none;
+}
+
+.outcomes-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #4ade80;
+}
+
+/* Outcome Input Styles (for create/edit course form) */
+.outcome-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.outcome-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.outcome-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-remove-outcome {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-remove-outcome:hover {
+  background: #dc2626;
+}
+
+.btn-remove-outcome:focus {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
+/* Lesson Outcomes in Syllabus */
+.lesson-outcomes-section {
+  margin-top: 12px;
+  padding-left: 40px;
+}
+
+.outcomes-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+  margin-top: 12px;
+}
+
+.lesson-outcomes-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.lesson-outcomes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lesson-outcomes-list li {
+  padding: 6px 0;
+  padding-left: 24px;
+  position: relative;
+  font-size: 0.9rem;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.lesson-outcomes-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  font-weight: bold;
+  color: #4ade80;
+  font-size: 1rem;
+}
+
+/* Lesson duration display in syllabus */
+.lesson-duration {
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: normal;
+  margin-left: 8px;
+}

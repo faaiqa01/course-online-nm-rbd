@@ -612,6 +612,7 @@ class Lesson(db.Model):
     video_url = db.Column(db.String(500), default='')
     meeting_url = db.Column(db.String(500), default='') # New field for meeting links
     start_date = db.Column(db.DateTime, nullable=True)
+    duration_minutes = db.Column(db.Integer, nullable=True) # Duration in minutes
 
 class Enrollment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -688,6 +689,12 @@ class ExerciseSubmission(db.Model):
     score = db.Column(db.Integer, nullable=False, default=0)
 
     __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_exercise_submission_user_course'),)
+
+class LearningOutcome(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
+    outcome_text = db.Column(db.String(500), nullable=False)
+    order_index = db.Column(db.Integer, default=0)
 
 
 def ensure_course_thumbnail_column():
@@ -1329,10 +1336,12 @@ def course_detail(course_id):
         'enrolled': is_enrolled,
         'unlocked': is_unlocked
     }
+    
     return render_template('course_detail.html', course=c, lessons=lessons, questions=questions,
                            is_enrolled=is_enrolled, is_unlocked=is_unlocked, is_in_cart=is_in_cart, 
                            attempt=attempt, progress=progress, certificate_progress=certificate_progress,
-                           exercise=exercise, exercise_submission=exercise_submission, now=datetime.utcnow() + timedelta(hours=7))
+                           exercise=exercise, exercise_submission=exercise_submission, 
+                           now=datetime.utcnow() + timedelta(hours=7))
 
 @app.route('/course/<int:course_id>/syllabus')
 def view_syllabus(course_id):
@@ -1341,11 +1350,18 @@ def view_syllabus(course_id):
     questions = Question.query.filter_by(course_id=course_id).all()
     exercise = Exercise.query.filter_by(course_id=course_id).first()
     
+    # Get learning outcomes for each lesson
+    lesson_outcomes = {}
+    for lesson in lessons:
+        outcomes = LearningOutcome.query.filter_by(lesson_id=lesson.id).order_by(LearningOutcome.order_index).all()
+        lesson_outcomes[lesson.id] = outcomes
+    
     return render_template('syllabus.html', 
                            course=course, 
                            lessons=lessons, 
                            questions=questions, 
-                           exercise=exercise)
+                           exercise=exercise,
+                           lesson_outcomes=lesson_outcomes)
 
 @app.route('/cart')
 @login_required
@@ -1659,7 +1675,6 @@ def edit_course(course_id):
 
         course.quiz_start_date = datetime.strptime(quiz_start_date_str, '%Y-%m-%dT%H:%M') if quiz_start_date_str else None
         course.quiz_end_date = datetime.strptime(quiz_end_date_str, '%Y-%m-%dT%H:%M') if quiz_end_date_str else None
-
         db.session.commit()
         flash('Course updated', 'success')
         return redirect(url_for('edit_course', course_id=course_id))
@@ -1715,6 +1730,8 @@ def create_lesson(course_id):
         content = request.form.get('content', '')
         start_date_str = request.form.get('start_date')
         start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M') if start_date_str else None
+        duration_minutes = request.form.get('duration_minutes')
+        duration = int(duration_minutes) if duration_minutes and duration_minutes.strip() else None
 
         if category == 'video':
             meeting_url = ''
@@ -1724,9 +1741,22 @@ def create_lesson(course_id):
             video_url = ''
             meeting_url = ''
 
-        l = Lesson(course_id=course_id, title=title, content=content, video_url=video_url, meeting_url=meeting_url, start_date=start_date)
+        l = Lesson(course_id=course_id, title=title, content=content, video_url=video_url, meeting_url=meeting_url, start_date=start_date, duration_minutes=duration)
         db.session.add(l)
         db.session.commit()
+        
+        # Save learning outcomes
+        outcomes = request.form.getlist('outcomes[]')
+        for idx, outcome_text in enumerate(outcomes, start=1):
+            if outcome_text and outcome_text.strip():
+                outcome = LearningOutcome(
+                    lesson_id=l.id,
+                    outcome_text=outcome_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(outcome)
+        db.session.commit()
+        
         flash('Lesson added', 'success')
         return redirect(url_for('course_detail', course_id=course_id))
     return render_template('create_lesson.html', course=c, lesson=None)
@@ -1747,6 +1777,8 @@ def edit_lesson(course_id, lesson_id):
         meeting_url = request.form.get('meeting_url', '')
         start_date_str = request.form.get('start_date')
         lesson.start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M') if start_date_str else None
+        duration_minutes = request.form.get('duration_minutes')
+        lesson.duration_minutes = int(duration_minutes) if duration_minutes and duration_minutes.strip() else None
 
         if category == 'video':
             lesson.video_url = video_url
@@ -1758,10 +1790,25 @@ def edit_lesson(course_id, lesson_id):
             lesson.video_url = ''
             lesson.meeting_url = ''
 
+        # Update learning outcomes - delete old ones and create new ones
+        LearningOutcome.query.filter_by(lesson_id=lesson_id).delete()
+        outcomes = request.form.getlist('outcomes[]')
+        for idx, outcome_text in enumerate(outcomes, start=1):
+            if outcome_text and outcome_text.strip():
+                outcome = LearningOutcome(
+                    lesson_id=lesson_id,
+                    outcome_text=outcome_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(outcome)
+
         db.session.commit()
         flash('Lesson updated', 'success')
         return redirect(url_for('course_detail', course_id=course_id))
-    return render_template('create_lesson.html', course=course, lesson=lesson)
+    
+    # Load existing outcomes for edit mode
+    existing_outcomes = LearningOutcome.query.filter_by(lesson_id=lesson_id).order_by(LearningOutcome.order_index).all()
+    return render_template('create_lesson.html', course=course, lesson=lesson, existing_outcomes=existing_outcomes)
 
 
 @app.route('/course/<int:course_id>/lesson/<int:lesson_id>/delete', methods=['POST'])
