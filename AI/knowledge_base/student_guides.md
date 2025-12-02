@@ -22,10 +22,12 @@
 2. Klik tombol **Tambah ke Keranjang**.
 3. Buka menu **Keranjang** (ikon keranjang di atas).
 4. Periksa daftar kursus yang akan dibeli.
-5. Klik **Checkout** untuk membayar.
-6. Popup Midtrans akan muncul. Pilih metode pembayaran (GoPay, Transfer Bank, dll).
-7. Selesaikan pembayaran sesuai instruksi.
-8. Setelah sukses, Anda akan diarahkan ke halaman Sukses dan kursus otomatis terbuka.
+6. Klik **Checkout** untuk membayar.
+7. Perilaku checkout tergantung konfigurasi server:
+   - Pada beberapa pengaturan/development, checkout keranjang dapat langsung memproses pendaftaran (tanpa popup gateway) dan kursus akan otomatis terbuka.
+   - Jika Midtrans atau gateway lain diaktifkan, popup Midtrans akan muncul; ikuti instruksi pembayaran di popup tersebut.
+8. Selesaikan pembayaran sesuai instruksi (jika menggunakan Midtrans).
+9. Setelah pembayaran berhasil, Anda akan diarahkan ke halaman Sukses dan kursus akan terbuka/di-unlock.
 
 ## Pembelajaran
 
@@ -47,8 +49,8 @@
 2. Klik tombol **Mulai Kuis**.
 3. Jawab semua pertanyaan pilihan ganda.
 4. Klik **Submit**.
-5. **PENTING**: Kuis hanya bisa dikerjakan **SATU KALI**. Pastikan Anda yakin sebelum submit.
-6. Nilai akan langsung muncul.
+5. Peraturan percobaan (attempts) dapat berbeda untuk setiap kursus: beberapa kursus mengizinkan **lebih dari satu percobaan**, sedangkan lainnya dapat dibatasi menjadi satu percobaan. Periksa pengaturan kursus (atau tanyakan ke instruktur) sebelum memulai.
+6. Nilai akan langsung muncul setelah submit.
 
 ### Mengumpulkan Tugas (Exercise)
 1. Jika ada tugas, klik menu **Tugas/Exercise**.
@@ -59,9 +61,9 @@
 6. Tunggu instruktur memberikan nilai dan feedback.
 
 ### Mengunduh Sertifikat
-1. Syarat mendapatkan sertifikat:
-   - Progress materi **100%** (semua materi ditandai selesai).
-   - Nilai Kuis **100** (sempurna).
+1. Syarat mendapatkan sertifikat bergantung pada pengaturan kursus, namun biasanya meliputi:
+   - Progress materi lengkap (mis. semua pelajaran ditandai selesai).
+   - Nilai kuis minimal sesuai `passing_grade` kursus (bukan selalu 100 — nilai minimal ditentukan oleh instruktur/pengaturan kursus).
 2. Jika syarat terpenuhi, tombol **Download Sertifikat** akan aktif di halaman Kursus Saya atau detail kursus.
 3. Klik tombol tersebut untuk mengunduh file PDF sertifikat.
 

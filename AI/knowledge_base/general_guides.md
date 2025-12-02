@@ -11,7 +11,7 @@
    - **Student**: Untuk belajar dan mengikuti kursus.
    - **Instructor**: Untuk mengajar dan membuat kursus.
 6. Klik tombol **Register**.
-7. Anda akan otomatis login dan diarahkan ke dashboard sesuai peran Anda.
+7. Setelah registrasi, Anda akan diarahkan ke halaman Login. (Aplikasi saat ini meminta Anda untuk login setelah mendaftar.)
 
 ### Cara Login
 1. Buka halaman Login (`/login`) atau klik tombol "Login".
@@ -27,9 +27,9 @@
 
 ### Cara Reset Password (Lupa Password)
 1. Di halaman Login, klik link "Lupa Password?".
-2. Masukkan email Anda.
-3. Ikuti instruksi yang dikirimkan ke email (simulasi: token reset akan muncul di log/console jika email server belum dikonfigurasi).
-4. Masukkan password baru Anda.
+2. Masukkan email Anda dan password baru pada formulir yang disediakan.
+3. Jika email terdaftar, sistem akan langsung mengubah password Anda (implementasi saat ini melakukan perubahan langsung pada akun jika email ditemukan).
+4. Catatan: fitur reset via email (token) hanya bekerja jika server email dikonfigurasi; pada instalasi pengembang biasanya proses ini disimulasikan atau di-handle langsung oleh server.
 
 ### Mengelola Profil
 1. Klik menu **Profil** di navigasi atas.

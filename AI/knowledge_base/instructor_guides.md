@@ -9,7 +9,7 @@
 ## Manajemen Kursus
 
 ### Membuat Kursus Baru
-1. Klik menu **Buat Kursus** (`/create-course`).
+1. Klik menu **Buat Kursus** (route: `/course/create`).
 2. Isi formulir:
    - **Judul Kursus**: Nama kursus yang menarik.
    - **Deskripsi**: Penjelasan detail tentang apa yang dipelajari.
@@ -20,7 +20,7 @@
 3. Klik **Simpan Kursus**.
 
 ### Mengedit & Menghapus Kursus
-1. Buka **Dashboard Instruktur** (`/instructor-dashboard`).
+1. Buka **Dashboard Instruktur** (route: `/instructor`).
 2. Di kartu kursus, klik tombol **Edit** (ikon pensil) untuk mengubah info kursus.
 3. Klik tombol **Hapus** (ikon sampah) untuk menghapus kursus permanen.
 
