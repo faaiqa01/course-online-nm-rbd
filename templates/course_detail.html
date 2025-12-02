@@ -1,232 +1,330 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ course.title }}{% if current_user.is_authenticated and current_user.role == 'student' %} <span class="badge">{{ 'Diikuti' if is_enrolled else 'Belum Daftar' }}</span>{% endif %}{% if course.is_premium %} <span class="badge">Premium</span>{% endif %}</h2>
+<h2>{{ course.title }}{% if current_user.is_authenticated and current_user.role == 'student' %} <span class="badge">{{
+    'Diikuti' if is_enrolled else 'Belum Daftar' }}</span>{% endif %}{% if course.is_premium %} <span
+    class="badge">Premium</span>{% endif %}</h2>
 <p>{{ course.description }}</p>
 
 {% if current_user.is_authenticated %}
-  {% if current_user.role == 'instructor' and course.instructor_id == current_user.id %}
-    <div class="card-actions">
-      <a class="btn primary" href="{{ url_for('create_lesson', course_id=course.id) }}">Tambah Materi</a>
-    </div>
-  {% endif %}
+{% if current_user.role == 'instructor' and course.instructor_id == current_user.id %}
+<div class="card-actions">
+  <a class="btn primary" href="{{ url_for('create_lesson', course_id=course.id) }}">Tambah Materi</a>
+</div>
+{% endif %}
 {% endif %}
 
 {% if progress and is_enrolled %}
-  <div class="progress-card">
-    <div class="progress-summary"><strong>Progress:</strong> {{ progress.completed }}/{{ progress.total }} components completed ({{ progress.percent }}%)</div>
-    <div class="progress-bar">
-      <div class="progress-bar-fill" style="width: {{ progress.percent if progress.percent > 0 else 0 }}%;"></div>
-    </div>
-    {% if not current_user.is_authenticated %}
-      <div class="progress-actions">
-        {% if course.is_premium %}
-          <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}">
-            <button class="btn primary" type="submit">Tambah Ke Keranjang</button>
-          </form>
-        {% else %}
-          <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}">
-            <button class="btn primary" type="submit">Daftar</button>
-          </form>
-        {% endif %}
-      </div>
-      <p class="progress-note">{% if course.is_premium %}Login untuk menambahkan course ini ke keranjang kamu.{% else %}Klik tombol Daftar untuk bergabung ke course.{% endif %}</p>
-    {% elif current_user.role == 'student' %}
-      <div class="progress-actions">
-        {% if not is_enrolled %}
-          {% if course.is_premium %}
-            {% if is_in_cart %}
-              <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
-            {% else %}
-              <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}">
-                <button class="btn" type="submit">Tambah Ke Keranjang</button>
-              </form>
-            {% endif %}
-          {% else %}
-            <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}">
-              <button class="btn" type="submit">Daftar</button>
-            </form>
-          {% endif %}
-        {% elif attempt and attempt.score == 100 %}
-          <form method="get" action="{{ url_for('download_certificate', course_id=course.id) }}">
-            <button class="btn secondary" type="submit" title="Download sertifikat">Download Sertifikat</button>
-          </form>
-        {% else %}
-          <button class="btn secondary" type="button" disabled title="Capai skor 100 untuk unduh sertifikat">Download Sertifikat</button>
-        {% endif %}
-      </div>
-      {% if not is_enrolled %}
-        {% if course.is_premium %}
-          {% if is_in_cart %}
-            <p class="progress-note">Course ini sudah ada di keranjang kamu. Lanjutkan pembayaran untuk mengakses materi.</p>
-          {% else %}
-            <p class="progress-note">Tambahkan ke keranjang untuk melanjutkan proses pembayaran.</p>
-          {% endif %}
-        {% else %}
-          <p class="progress-note">Klik tombol Daftar untuk bergabung ke course.</p>
-        {% endif %}
-      {% elif attempt and attempt.score < 100 %}
-        <p class="progress-note">Capai skor 100 pada kuis untuk mengunduh sertifikat.</p>
-      {% endif %}
+<div class="progress-card">
+  <div class="progress-summary"><strong>Progress:</strong> {{ progress.completed }}/{{ progress.total }} components
+    completed ({{ progress.percent }}%)</div>
+  <div class="progress-bar">
+    <div class="progress-bar-fill" style="width: {{ progress.percent }}%;"></div>
+  </div>
+  {% if not current_user.is_authenticated %}
+  <div class="progress-actions">
+    {% if course.is_premium %}
+    <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}">
+      <button class="btn primary" type="submit">Tambah Ke Keranjang</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}">
+      <button class="btn primary" type="submit">Daftar</button>
+    </form>
     {% endif %}
   </div>
-{% endif %}
+  <p class="progress-note">{% if course.is_premium %}Login untuk menambahkan course ini ke keranjang kamu.{% else %}Klik
+    tombol Daftar untuk bergabung ke course.{% endif %}</p>
+  {% elif current_user.role == 'student' %}
+  <div class="progress-actions">
+    {% if not is_enrolled %}
+    {% if course.is_premium %}
+    {% if is_in_cart %}
+    <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
+    {% else %}
+    <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}">
+      <button class="btn" type="submit">Tambah Ke Keranjang</button>
+    </form>
+    {% endif %}
+    {% else %}
+    <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}">
+      <button class="btn" type="submit">Daftar</button>
+    </form>
+    {% endif %}
+    {% elif is_enrolled %}
+    {# Certificate Progress Card - Only for enrolled students #}
+    <div class="certificate-progress-card" style="margin: 0 auto; max-width: 600px;">
+      <div class="card-header" style="text-align: center;">
+        <h4>📜 Sertifikat Kelulusan</h4>
+      </div>
 
-{% if (is_enrolled and is_unlocked) or (current_user.is_authenticated and current_user.id == course.instructor_id) %}
-<hr>
-<h3>Lessons</h3>
-{% if lessons %}
-  <div class="lesson-list">
-    {% for l in lessons %}
+      <div class="progress-summary">
+        Progress: {{ certificate_progress.completed_components }}/{{ certificate_progress.total_components }} components
+        completed ({{ certificate_progress.percentage }}%)
+      </div>
+
+      <div class="progress-details">
+        {# Materi Pembelajaran #}
+        <div class="progress-item">
+          {% if certificate_progress.lessons.status == 'complete' %}
+          <span class="icon-success">✅</span>
+          {% else %}
+          <span class="icon-error">❌</span>
+          {% endif %}
+          <span>Materi Pembelajaran: {{ certificate_progress.lessons.completed }}/{{ certificate_progress.lessons.total
+            }} selesai</span>
+        </div>
+
+        {# Kuis #}
+        <div class="progress-item">
+          {% if certificate_progress.quiz.status == 'complete' %}
+          <span class="icon-success">✅</span>
+          {% elif certificate_progress.quiz.status == 'incomplete' %}
+          <span class="icon-error">❌</span>
+          {% else %}
+          <span class="icon-warning">⚠️</span>
+          {% endif %}
+
+          <span>
+            {% if certificate_progress.quiz.attempted %}
+            Kuis: Skor {{ certificate_progress.quiz.score }}/{{ certificate_progress.quiz.target }}
+            {% if certificate_progress.quiz.status == 'complete' %}
+            (sempurna!)
+            {% else %}
+            (belum mencapai target)
+            {% endif %}
+            {% else %}
+            Kuis: Belum mengikuti (target: {{ certificate_progress.quiz.target }})
+            {% endif %}
+          </span>
+        </div>
+
+        {# Latihan #}
+        <div class="progress-item">
+          {% if certificate_progress.exercise.status == 'not_required' %}
+          <span class="icon-info">ℹ️</span>
+          <span>Latihan: Tidak diperlukan untuk kursus ini</span>
+          {% elif certificate_progress.exercise.status == 'complete' %}
+          <span class="icon-success">✅</span>
+          <span>Latihan: Selesai (skor: {{ certificate_progress.exercise.score }})</span>
+          {% elif certificate_progress.exercise.status == 'pending' %}
+          <span class="icon-warning">⚠️</span>
+          <span>Latihan: Sudah submit, menunggu penilaian</span>
+          {% else %}
+          <span class="icon-error">❌</span>
+          <span>Latihan: Belum submit</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {# End Certificate Progress Card #}
+  {# Download Certificate Button #}
+  <div style="text-align: center; margin-top: 1rem;">
+  {% if attempt and attempt.score >= (course.passing_grade if course.passing_grade else 100) %}
+  <form method="get" action="{{ url_for('download_certificate', course_id=course.id) }}" style="display: inline-block;">
+    <button class="btn secondary" type="submit" title="Download sertifikat">Download Sertifikat</button>
+  </form>
+  {% else %}
+  <button class="btn secondary" type="button" disabled title="Capai passing grade ({{ course.passing_grade if course.passing_grade else 100 }}) untuk unduh sertifikat">Download
+    Sertifikat</button>
+  {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% if not is_enrolled %}
+{% if course.is_premium %}
+{% if is_in_cart %}
+<p class="progress-note">Course ini sudah ada di keranjang kamu. Lanjutkan pembayaran untuk mengakses materi.</p>
+{% else %}
+<p class="progress-note">Tambahkan ke keranjang untuk melanjutkan proses pembayaran.</p>
+{% endif %}
+{% else %}
+<p class="progress-note">Klik tombol Daftar untuk bergabung ke course.</p>
+{% endif %}
+{% elif attempt and attempt.score < (course.passing_grade if course.passing_grade else 100) %} <p class="progress-note">Capai passing grade ({{ course.passing_grade if course.passing_grade else 100 }}) pada kuis untuk mengunduh sertifikat.
+  </p>
+  {% endif %}
+  {% endif %}
+  {% endif %}
+
+  {% if (is_enrolled and is_unlocked) or (current_user.is_authenticated and current_user.id == course.instructor_id) %}
+  <div class="card" style="margin-top: 24px;">
+    <h3>Lessons</h3>
+    {% if lessons %}
+    <div class="lesson-list">
+      {% for l in lessons %}
       <div class="lesson-card">
-        {% if l.start_date and now < l.start_date and current_user.role == 'student' %}
-          <h4>{{ l.title }}</h4>
+        {% if l.start_date and now < l.start_date and current_user.role=='student' %} <h4>{{ l.title }}</h4>
           <div class="lesson-locked" style="text-align: center; margin: 1rem 0;">
-              <p>Materi akan tampil pada tanggal {{ l.start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
+            <p>Materi akan tampil pada tanggal {{ l.start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
           </div>
-        {% else %}
-        {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id == current_user.id %}
-          <a class="btn secondary small lesson-edit-btn" href="{{ url_for('edit_lesson', course_id=course.id, lesson_id=l.id) }}">Edit Materi</a>
-        {% endif %}
-        <h4>{{ l.title }}</h4>
-        <p>{{ l.content }}</p>
-        {% if l.meeting_url %}
+          {% else %}
+          {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id ==
+          current_user.id %}
+          <a class="btn secondary small lesson-edit-btn"
+            href="{{ url_for('edit_lesson', course_id=course.id, lesson_id=l.id) }}">Edit Materi</a>
+          {% endif %}
+          <h4>{{ l.title }}{% if l.duration_minutes %} <span class="lesson-duration">| {% if l.duration_minutes < 60 %}{{ l.duration_minutes }} menit{% else %}{{ "%.1f"|format(l.duration_minutes / 60) }} jam{% endif %}</span>{% endif %}</h4>
+          <p>{{ l.content }}</p>
+
+          {% if l.meeting_url %}
           <div style="text-align: center; margin: 1rem 0;">
             <a href="{{ l.meeting_url }}" class="btn primary" target="_blank" rel="noopener">Klik Ikuti</a>
           </div>
-        {% elif l.embed %}
+          {% elif l.embed %}
           <div class="video-container">
             {% if l.embed.type == 'video' %}
-              <div class="video-wrapper">
-                <video controls preload="metadata">
-                  <source src="{{ l.embed.embed_url }}">
-                  Your browser does not support the video tag.
-                </video>
-              </div>
+            <div class="video-wrapper">
+              <video controls preload="metadata">
+                <source src="{{ l.embed.embed_url }}">
+                Your browser does not support the video tag.
+              </video>
+            </div>
             {% else %}
-              <div class="video-wrapper">
-                <iframe src="{{ l.embed.embed_url }}" title="{{ l.title }} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
-              </div>
+            <div class="video-wrapper">
+              <iframe src="{{ l.embed.embed_url }}" title="{{ l.title }} video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen loading="lazy"></iframe>
+            </div>
             {% endif %}
           </div>
-        {% elif l.video_url %}
+          {% elif l.video_url %}
           <p><a href="{{ l.video_url }}" target="_blank" rel="noopener">Open video</a></p>
-        {% endif %}
-        {% if current_user.is_authenticated and current_user.role != 'instructor' %}
+          {% endif %}
+
+          {% if current_user.is_authenticated and current_user.role != 'instructor' %}
           <div class="lesson-actions">
             {% if not is_enrolled %}
-              <span class="badge locked">Daftar terlebih dahulu</span>
+            <span class="badge locked">Daftar terlebih dahulu</span>
             {% elif l.is_completed %}
-              <span class="badge completed">Selesai</span>
+            <span class="badge completed">Selesai</span>
             {% else %}
-              <form method="post" action="{{ url_for('complete_lesson', course_id=course.id, lesson_id=l.id) }}">
-                <button class="btn success" type="submit">Selesai Materi</button>
-              </form>
+            <form method="post" action="{{ url_for('complete_lesson', course_id=course.id, lesson_id=l.id) }}">
+              <button class="btn success" type="submit">Selesai Materi</button>
+            </form>
             {% endif %}
           </div>
-        {% endif %}
-        {% endif %}
+          {% endif %}
+          {% endif %}
       </div>
-    {% endfor %}
-  </div>
-{% else %}
-  <p>No lessons yet.</p>
-{% endif %}
-
-<hr>
-<h3>Quiz</h3>
-{% if questions %}
-  {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id == current_user.id %}
-    <a class="btn secondary" href="{{ url_for('manage_quiz', course_id=course.id) }}">Quiz Details</a>
-  {% endif %}
-  {% if is_enrolled %}
-    {% if course.quiz_start_date and now < course.quiz_start_date %}
-        <p><strong>Kuis tersedia mulai:</strong> {{ course.quiz_start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-        <button class="btn" disabled>Mulai Kuis</button>
-    {% elif course.quiz_end_date and now > course.quiz_end_date %}
-        <p><strong>Kuis telah ditutup pada:</strong> {{ course.quiz_end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-        <button class="btn" disabled>Mulai Kuis</button>
+      {% endfor %}
+    </div>
     {% else %}
-        {% if course.quiz_start_date %}
-            <p><strong>Kuis tersedia mulai:</strong> {{ course.quiz_start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-        {% endif %}
-        {% if course.quiz_end_date %}
-            <p><strong>Kuis ditutup pada:</strong> {{ course.quiz_end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-        {% endif %}
-        {% if current_user.is_authenticated and current_user.role == 'student' and attempt %}
-            <p><strong>Anda sudah mengerjakan kuis ini. Kuis hanya dapat dikerjakan satu kali.</strong></p>
-            <button class="btn" disabled>Mulai Kuis</button>
-        {% else %}
-            <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
-        {% endif %}
+    <p>No lessons yet.</p>
     {% endif %}
-  {% elif not current_user.is_authenticated or current_user.role == 'student' %}
-    {% if course.is_premium %}
-      {% if is_in_cart %}
-        <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
+
+    <hr>
+    <h3>Quiz</h3>
+    {% if questions %}
+    {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id ==
+    current_user.id %}
+    <a class="btn secondary" href="{{ url_for('manage_quiz', course_id=course.id) }}">Quiz Details</a>
+    {% endif %}
+    {% if is_enrolled %}
+    {% if course.quiz_start_date and now < course.quiz_start_date %} <p><strong>Kuis tersedia mulai:</strong> {{
+      course.quiz_start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
+      <button class="btn" disabled>Mulai Kuis</button>
+      {% elif course.quiz_end_date and now > course.quiz_end_date %}
+      <p><strong>Kuis telah ditutup pada:</strong> {{ course.quiz_end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
+      <button class="btn" disabled>Mulai Kuis</button>
       {% else %}
-        <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}">
-          <button class="btn">Tambah Ke Keranjang</button>
-        </form>
+      {% if course.quiz_start_date %}
+      <p><strong>Kuis tersedia mulai:</strong> {{ course.quiz_start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
       {% endif %}
-    {% else %}
+      {% if course.quiz_end_date %}
+      <p><strong>Kuis ditutup pada:</strong> {{ course.quiz_end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
+      {% endif %}
+      {% if course.passing_grade %}
+      <p><strong>Passing Grade:</strong> {{ course.passing_grade }}</p>
+      {% endif %}
+      {% if course.attempt_limit > 0 %}
+      <p><strong>Limit Percobaan:</strong> {{ attempt_count }}/{{ course.attempt_limit }}</p>
+      {% else %}
+      <p><strong>Limit Percobaan:</strong> Unlimited{% if attempt_count > 0 %} (sudah {{ attempt_count }}x){% endif %}</p>
+      {% endif %}
+      {% if current_user.is_authenticated and current_user.role == 'student' %}
+        {% if course.attempt_limit > 0 and attempt_count >= course.attempt_limit %}
+      <p><strong>Anda sudah mencapai batas maksimal percobaan.</strong></p>
+      <button class="btn" disabled>Mulai Kuis</button>
+        {% else %}
+      <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
+        {% endif %}
+      {% else %}
+      <a class="btn" href="{{ url_for('take_quiz', course_id=course.id) }}">Mulai Kuis</a>
+      {% endif %}
+      {% endif %}
+      {% elif not current_user.is_authenticated or current_user.role == 'student' %}
+      {% if course.is_premium %}
+      {% if is_in_cart %}
+      <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
+      {% else %}
+      <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}">
+        <button class="btn">Tambah Ke Keranjang</button>
+      </form>
+      {% endif %}
+      {% else %}
       <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}">
         <button class="btn">Daftar</button>
       </form>
-    {% endif %}
-  {% endif %}
-{% else %}
-  {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id == current_user.id %}
-    <a class="btn secondary" href="{{ url_for('manage_quiz', course_id=course.id) }}">Quiz Details</a>
-  {% else %}
-    <p>Tidak ada quiz yang tersedia.</p>
-  {% endif %}
-{% endif %}
+      {% endif %}
+      {% endif %}
+      {% else %}
+      {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id ==
+      current_user.id %}
+      <a class="btn secondary" href="{{ url_for('manage_quiz', course_id=course.id) }}">Quiz Details</a>
+      {% else %}
+      <p>Tidak ada quiz yang tersedia.</p>
+      {% endif %}
+      {% endif %}
 
-{% if attempt %}
-<div style="margin-top: 1rem;">
-  <div class="card">
-    <h3>Your Last Result</h3>
-    <p>Score: <strong>{{ attempt.score }}</strong> | Passed: <strong>{{ 'Yes' if attempt.passed else 'No' }}</strong></p>
-  </div>
-</div>
-{% endif %}
+      {% if attempt %}
+      <div style="margin-top: 1rem;">
+        <div class="card">
+          <h3>Your Last Result</h3>
+          <p>Score: <strong>{{ attempt.score }}</strong> | Passed: <strong>{{ 'Yes' if attempt.passed else 'No'
+              }}</strong></p>
+        </div>
+      </div>
+      {% endif %}
 
-<hr>
-<h3>Latihan</h3>
-{% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id == current_user.id %}
-  <a class="btn secondary" href="{{ url_for('manage_exercise', course_id=course.id) }}">Details Latihan</a>
-{% elif is_enrolled %}
-  {% if exercise %}
-    <h4>{{ exercise.name }}</h4>
-    <p>{{ exercise.description }}</p>
-    
-    {% if exercise.start_date and now < exercise.start_date %}
-      <p><strong>Latihan tersedia mulai:</strong> {{ exercise.start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-        <button class="btn" disabled>Lihat Materi Latihan</button>
-        <button class="btn primary" disabled>Mulai Latihan</button>
-      </div>
-    {% elif exercise.end_date and now > exercise.end_date %}
-      <p><strong>Latihan telah ditutup pada:</strong> {{ exercise.end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-        <button class="btn" disabled>Lihat Materi Latihan</button>
-        <button class="btn primary" disabled>Mulai Latihan</button>
-      </div>
-    {% else %}
-      {% if exercise.start_date %}
+      <hr>
+      <h3>Latihan</h3>
+      {% if current_user.is_authenticated and current_user.role == 'instructor' and course.instructor_id ==
+      current_user.id %}
+      <a class="btn secondary" href="{{ url_for('manage_exercise', course_id=course.id) }}">Details Latihan</a>
+      {% elif is_enrolled %}
+      {% if exercise %}
+      <h4>{{ exercise.name }}</h4>
+      <p>{{ exercise.description }}</p>
+
+      {% if exercise.start_date and now < exercise.start_date %} <p><strong>Latihan tersedia mulai:</strong> {{
+        exercise.start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+          <button class="btn" disabled>Lihat Materi Latihan</button>
+          <button class="btn primary" disabled>Mulai Latihan</button>
+        </div>
+        {% elif exercise.end_date and now > exercise.end_date %}
+        <p><strong>Latihan telah ditutup pada:</strong> {{ exercise.end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+          <button class="btn" disabled>Lihat Materi Latihan</button>
+          <button class="btn primary" disabled>Mulai Latihan</button>
+        </div>
+        {% else %}
+        {% if exercise.start_date %}
         <p><strong>Latihan tersedia mulai:</strong> {{ exercise.start_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-      {% endif %}
-      {% if exercise.end_date %}
+        {% endif %}
+        {% if exercise.end_date %}
         <p><strong>Latihan ditutup pada:</strong> {{ exercise.end_date.strftime('%d %B %Y pukul %H:%M') }}</p>
-      {% endif %}
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-        <a class="btn" href="{{ exercise.exercise_url }}" target="_blank" rel="noopener">Lihat Materi Latihan</a>
-        <a class="btn primary" href="{{ url_for('submit_exercise', course_id=course.id) }}">Mulai Latihan</a>
-      </div>
-    {% endif %}
+        {% endif %}
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+          <a class="btn" href="{{ exercise.exercise_url }}" target="_blank" rel="noopener">Lihat Materi Latihan</a>
+          <a class="btn primary" href="{{ url_for('submit_exercise', course_id=course.id) }}">Mulai Latihan</a>
+        </div>
+        {% endif %}
 
-    {% if exercise_submission %}
-        <p><strong>Latihan Anda yang telah dikirim:</strong> <a href="{{ exercise_submission.submission_url }}" target="_blank" rel="noopener">{{ exercise_submission.submission_url }}</a></p>
+        {% if exercise_submission %}
+        <p><strong>Latihan Anda yang telah dikirim:</strong> <a href="{{ exercise_submission.submission_url }}"
+            target="_blank" rel="noopener">{{ exercise_submission.submission_url }}</a></p>
 
         <div style="margin-top: 1rem;">
           <div class="card">
@@ -234,52 +332,54 @@
             <p>Score: <strong>{{ exercise_submission.score }}</strong></p>
           </div>
         </div>
-    {% else %}
+        {% else %}
         <p>Anda belum mengirimkan latihan.</p>
-    {% endif %}
+        {% endif %}
 
+        {% else %}
+        <p>Tidak ada latihan yang tersedia.</p>
+        {% endif %}
+        {% else %}
+        <p>Daftar untuk melihat latihan.</p>
+        {% endif %}
+  </div>
   {% else %}
-    <p>Tidak ada latihan yang tersedia.</p>
-  {% endif %}
-{% else %}
-  <p>Daftar untuk melihat latihan.</p>
-{% endif %}
-
-{% else %}
-<hr>
-<div class="card" style="margin-top: 2rem; text-align: center; padding: 2rem;">
+  <hr>
+  <div class="card" style="margin-top: 2rem; text-align: center; padding: 2rem;">
     <h3>Akses Terbatas</h3>
     <p>Materi kursus ini hanya tersedia untuk anggota yang terdaftar.</p>
     {% if not current_user.is_authenticated %}
-        <p>Silakan <a href="{{ url_for('login') }}">Login</a> atau <a href="{{ url_for('register') }}">Daftar</a> untuk mengikuti kursus ini.</p>
-        <div class="card-actions">
-            <a href="{{ url_for('login') }}" class="btn">Login</a>
-            <a href="{{ url_for('register') }}" class="btn secondary">Daftar</a>
-            <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
-        </div>
+    <p>Silakan <a href="{{ url_for('login') }}">Login</a> atau <a href="{{ url_for('register') }}">Daftar</a> untuk
+      mengikuti kursus ini.</p>
+    <div class="card-actions">
+      <a href="{{ url_for('login') }}" class="btn">Login</a>
+      <a href="{{ url_for('register') }}" class="btn secondary">Daftar</a>
+      <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
+    </div>
     {% else %}
-        <p>Anda harus mendaftar di kursus ini untuk melihat kontennya.</p>
-        <div class="progress-actions">
-            {% if not is_enrolled %}
-              {% if course.is_premium %}
-                {% if is_in_cart %}
-                  <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
-                {% else %}
-                  <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}" style="display: inline-block;">
-                    <button class="btn" type="submit">Tambah Ke Keranjang</button>
-                  </form>
-                {% endif %}
-              {% else %}
-                <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}" style="display: inline-block;">
-                  <button class="btn" type="submit">Daftar</button>
-                </form>
-              {% endif %}
-              <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
-            {% endif %}
-        </div>
+    <p>Anda harus mendaftar di kursus ini untuk melihat kontennya.</p>
+    <div class="progress-actions">
+      {% if not is_enrolled %}
+      {% if course.is_premium %}
+      {% if is_in_cart %}
+      <a class="btn secondary" href="{{ url_for('cart') }}">Lihat Keranjang</a>
+      {% else %}
+      <form method="post" action="{{ url_for('add_to_cart', course_id=course.id, next='detail') }}"
+        style="display: inline-block;">
+        <button class="btn" type="submit">Tambah Ke Keranjang</button>
+      </form>
+      {% endif %}
+      {% else %}
+      <form method="post" action="{{ url_for('enroll', course_id=course.id, next='detail') }}"
+        style="display: inline-block;">
+        <button class="btn" type="submit">Daftar</button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('view_syllabus', course_id=course.id) }}" class="btn secondary">Lihat Silabus Lengkap</a>
+      {% endif %}
+    </div>
     {% endif %}
-</div>
-{% endif %}
+  </div>
+  {% endif %}
 
-{% endblock %}
-
+  {% endblock %}

@@ -603,6 +603,8 @@ class Course(db.Model):
     material_type = db.Column(db.String(100), nullable=True) # Jenis Materi
     quiz_start_date = db.Column(db.DateTime, nullable=True)
     quiz_end_date = db.Column(db.DateTime, nullable=True)
+    passing_grade = db.Column(db.Integer, default=100)  # Passing grade for quiz (default 100)
+    attempt_limit = db.Column(db.Integer, default=0)  # 0 = unlimited attempts
 
 class Lesson(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -612,6 +614,7 @@ class Lesson(db.Model):
     video_url = db.Column(db.String(500), default='')
     meeting_url = db.Column(db.String(500), default='') # New field for meeting links
     start_date = db.Column(db.DateTime, nullable=True)
+    duration_minutes = db.Column(db.Integer, nullable=True) # Duration in minutes
 
 class Enrollment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -688,6 +691,19 @@ class ExerciseSubmission(db.Model):
     score = db.Column(db.Integer, nullable=False, default=0)
 
     __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_exercise_submission_user_course'),)
+
+class LearningOutcome(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
+    outcome_text = db.Column(db.String(500), nullable=False)
+    order_index = db.Column(db.Integer, default=0)
+
+
+class Skill(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
+    skill_text = db.Column(db.String(500), nullable=False)
+    order_index = db.Column(db.Integer, default=0)
 
 
 def ensure_course_thumbnail_column():
@@ -1254,6 +1270,12 @@ def course_detail(course_id):
                 completed_ids = {record.lesson_id for record in completed_records}
                 completed_count = len(completed_ids)
         attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
+    
+    # Count total attempts for this user on this course
+    attempt_count = 0
+    if current_user.is_authenticated and current_user.role == 'student':
+        attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
+    
     for lesson in lessons:
         if lesson.id in completed_ids:
             lesson.is_completed = True
@@ -1262,26 +1284,67 @@ def course_detail(course_id):
     completed_components = 0
 
     # Component 1: Lessons
+    lessons_status = 'incomplete'
     if lessons:
         total_components += 1
         if is_enrolled and completed_count == len(lessons):
             completed_components += 1
+            lessons_status = 'complete'
 
     # Component 2: Quiz
+    quiz_status = 'not_attempted'
+    quiz_score = 0
     if questions: # If there are any questions, a quiz exists
         total_components += 1
-        if is_enrolled and attempt and attempt.score == 100:
-            completed_components += 1
+        if is_enrolled and attempt:
+            quiz_score = attempt.score
+            passing_grade = c.passing_grade if c.passing_grade else 100
+            if attempt.score >= passing_grade:
+                completed_components += 1
+                quiz_status = 'complete'
+            else:
+                quiz_status = 'incomplete'
 
     # Component 3: Exercise
-    # exercise is already fetched: exercise = Exercise.query.filter_by(course_id=course_id).first()
+    exercise_status = 'not_required'
+    exercise_score = 0
     if exercise:
         total_components += 1
-        # exercise_submission is already fetched: exercise_submission = ExerciseSubmission.query.filter_by(user_id=current_user.id, course_id=course_id).first()
-        if is_enrolled and exercise_submission and exercise_submission.score is not None: # Assuming score is set upon submission/grading
-            completed_components += 1
+        exercise_status = 'not_submitted'
+        if is_enrolled and exercise_submission:
+            exercise_score = exercise_submission.score if exercise_submission.score else 0
+            if exercise_submission.score is not None and exercise_submission.score > 0:
+                completed_components += 1
+                exercise_status = 'complete'
+            else:
+                exercise_status = 'pending'
 
     percent = int((completed_components / total_components) * 100) if total_components else 0
+    
+    # Build certificate progress data
+    certificate_progress = {
+        'lessons': {
+            'completed': completed_count if is_enrolled else 0,
+            'total': len(lessons),
+            'status': lessons_status if is_enrolled else 'incomplete'
+        },
+        'quiz': {
+            'attempted': (attempt is not None) if is_enrolled else False,
+            'score': quiz_score if is_enrolled else 0,
+            'target': c.passing_grade if c.passing_grade else 100,
+            'status': quiz_status if is_enrolled else 'not_attempted'
+        },
+        'exercise': {
+            'required': exercise is not None,
+            'submitted': (exercise_submission is not None) if is_enrolled else False,
+            'score': exercise_score if is_enrolled else 0,
+            'status': exercise_status if is_enrolled else 'not_required'
+        },
+        'total_components': total_components,
+        'completed_components': completed_components if is_enrolled else 0,
+        'percentage': percent if is_enrolled else 0
+    }
+    
     progress = {
         'completed': completed_components if is_enrolled else 0,
         'total': total_components,
@@ -1289,9 +1352,12 @@ def course_detail(course_id):
         'enrolled': is_enrolled,
         'unlocked': is_unlocked
     }
+    
     return render_template('course_detail.html', course=c, lessons=lessons, questions=questions,
                            is_enrolled=is_enrolled, is_unlocked=is_unlocked, is_in_cart=is_in_cart, 
-                           attempt=attempt, progress=progress, exercise=exercise, exercise_submission=exercise_submission, now=datetime.utcnow() + timedelta(hours=7))
+                           attempt=attempt, attempt_count=attempt_count, progress=progress, certificate_progress=certificate_progress,
+                           exercise=exercise, exercise_submission=exercise_submission, 
+                           now=datetime.utcnow() + timedelta(hours=7))
 
 @app.route('/course/<int:course_id>/syllabus')
 def view_syllabus(course_id):
@@ -1300,11 +1366,23 @@ def view_syllabus(course_id):
     questions = Question.query.filter_by(course_id=course_id).all()
     exercise = Exercise.query.filter_by(course_id=course_id).first()
     
+    # Get learning outcomes and skills for each lesson
+    lesson_outcomes = {}
+    lesson_skills = {}
+    for lesson in lessons:
+        outcomes = LearningOutcome.query.filter_by(lesson_id=lesson.id).order_by(LearningOutcome.order_index).all()
+        lesson_outcomes[lesson.id] = outcomes
+        
+        skills = Skill.query.filter_by(lesson_id=lesson.id).order_by(Skill.order_index).all()
+        lesson_skills[lesson.id] = skills
+    
     return render_template('syllabus.html', 
                            course=course, 
                            lessons=lessons, 
                            questions=questions, 
-                           exercise=exercise)
+                           exercise=exercise,
+                           lesson_outcomes=lesson_outcomes,
+                           lesson_skills=lesson_skills)
 
 @app.route('/cart')
 @login_required
@@ -1618,7 +1696,6 @@ def edit_course(course_id):
 
         course.quiz_start_date = datetime.strptime(quiz_start_date_str, '%Y-%m-%dT%H:%M') if quiz_start_date_str else None
         course.quiz_end_date = datetime.strptime(quiz_end_date_str, '%Y-%m-%dT%H:%M') if quiz_end_date_str else None
-
         db.session.commit()
         flash('Course updated', 'success')
         return redirect(url_for('edit_course', course_id=course_id))
@@ -1674,6 +1751,8 @@ def create_lesson(course_id):
         content = request.form.get('content', '')
         start_date_str = request.form.get('start_date')
         start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M') if start_date_str else None
+        duration_minutes = request.form.get('duration_minutes')
+        duration = int(duration_minutes) if duration_minutes and duration_minutes.strip() else None
 
         if category == 'video':
             meeting_url = ''
@@ -1683,9 +1762,34 @@ def create_lesson(course_id):
             video_url = ''
             meeting_url = ''
 
-        l = Lesson(course_id=course_id, title=title, content=content, video_url=video_url, meeting_url=meeting_url, start_date=start_date)
+        l = Lesson(course_id=course_id, title=title, content=content, video_url=video_url, meeting_url=meeting_url, start_date=start_date, duration_minutes=duration)
         db.session.add(l)
         db.session.commit()
+        
+        # Save learning outcomes
+        outcomes = request.form.getlist('outcomes[]')
+        for idx, outcome_text in enumerate(outcomes, start=1):
+            if outcome_text and outcome_text.strip():
+                outcome = LearningOutcome(
+                    lesson_id=l.id,
+                    outcome_text=outcome_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(outcome)
+        
+        # Save skills
+        skills = request.form.getlist('skills[]')
+        for idx, skill_text in enumerate(skills, start=1):
+            if skill_text and skill_text.strip():
+                skill = Skill(
+                    lesson_id=l.id,
+                    skill_text=skill_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(skill)
+        
+        db.session.commit()
+        
         flash('Lesson added', 'success')
         return redirect(url_for('course_detail', course_id=course_id))
     return render_template('create_lesson.html', course=c, lesson=None)
@@ -1706,6 +1810,8 @@ def edit_lesson(course_id, lesson_id):
         meeting_url = request.form.get('meeting_url', '')
         start_date_str = request.form.get('start_date')
         lesson.start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M') if start_date_str else None
+        duration_minutes = request.form.get('duration_minutes')
+        lesson.duration_minutes = int(duration_minutes) if duration_minutes and duration_minutes.strip() else None
 
         if category == 'video':
             lesson.video_url = video_url
@@ -1717,10 +1823,38 @@ def edit_lesson(course_id, lesson_id):
             lesson.video_url = ''
             lesson.meeting_url = ''
 
+        # Update learning outcomes - delete old ones and create new ones
+        LearningOutcome.query.filter_by(lesson_id=lesson_id).delete()
+        outcomes = request.form.getlist('outcomes[]')
+        for idx, outcome_text in enumerate(outcomes, start=1):
+            if outcome_text and outcome_text.strip():
+                outcome = LearningOutcome(
+                    lesson_id=lesson_id,
+                    outcome_text=outcome_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(outcome)
+        
+        # Update skills - delete old ones and create new ones
+        Skill.query.filter_by(lesson_id=lesson_id).delete()
+        skills = request.form.getlist('skills[]')
+        for idx, skill_text in enumerate(skills, start=1):
+            if skill_text and skill_text.strip():
+                skill = Skill(
+                    lesson_id=lesson_id,
+                    skill_text=skill_text.strip(),
+                    order_index=idx
+                )
+                db.session.add(skill)
+
         db.session.commit()
         flash('Lesson updated', 'success')
         return redirect(url_for('course_detail', course_id=course_id))
-    return render_template('create_lesson.html', course=course, lesson=lesson)
+    
+    # Load existing outcomes and skills for edit mode
+    existing_outcomes = LearningOutcome.query.filter_by(lesson_id=lesson_id).order_by(LearningOutcome.order_index).all()
+    existing_skills = Skill.query.filter_by(lesson_id=lesson_id).order_by(Skill.order_index).all()
+    return render_template('create_lesson.html', course=course, lesson=lesson, existing_outcomes=existing_outcomes, existing_skills=existing_skills)
 
 
 @app.route('/course/<int:course_id>/lesson/<int:lesson_id>/delete', methods=['POST'])
@@ -2036,6 +2170,12 @@ def manage_quiz_dates(course_id):
         quiz_end_date_str = request.form.get('quiz_end_date')
 
 
+        passing_grade = request.form.get('passing_grade')
+
+
+        attempt_limit = request.form.get('attempt_limit')
+
+
 
 
 
@@ -2045,6 +2185,12 @@ def manage_quiz_dates(course_id):
 
 
         course.quiz_end_date = datetime.strptime(quiz_end_date_str, '%Y-%m-%dT%H:%M') if quiz_end_date_str else None
+
+
+        course.passing_grade = int(passing_grade) if passing_grade and passing_grade.strip() else 100
+
+
+        course.attempt_limit = int(attempt_limit) if attempt_limit and attempt_limit.strip() else 0
 
 
 
@@ -2144,17 +2290,27 @@ def take_quiz(course_id):
         flash('Enroll and unlock first', 'error')
         return redirect(url_for('course_detail', course_id=course_id))
     qs = Question.query.filter_by(course_id=course_id).all()
-    latest_attempt = None
+    
+    # Check attempt limit and calculate remaining attempts
+    attempt_count = 0
+    remaining_attempts = 0
     if current_user.role == 'student':
-        latest_attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
-        if latest_attempt and request.method == 'GET':
-            flash('Anda sudah menyelesaikan kuis ini. Kuis hanya dapat dikerjakan satu kali.', 'error')
-            return redirect(url_for('course_detail', course_id=course_id))
+        attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
+        # If attempt_limit > 0 (not unlimited) and user has reached the limit
+        if c.attempt_limit > 0:
+            remaining_attempts = c.attempt_limit - attempt_count
+            if attempt_count >= c.attempt_limit:
+                flash(f'Anda sudah mencapai batas maksimal percobaan ({c.attempt_limit}x).', 'error')
+                return redirect(url_for('course_detail', course_id=course_id))
 
     if request.method == 'POST':
-        if current_user.role == 'student' and latest_attempt:
-            flash('Kuis hanya dapat dikirim satu kali.', 'error')
-            return redirect(url_for('course_detail', course_id=course_id))
+        # Double check on POST
+        if current_user.role == 'student':
+            attempt_count = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).count()
+            if c.attempt_limit > 0 and attempt_count >= c.attempt_limit:
+                flash(f'Anda sudah mencapai batas maksimal percobaan ({c.attempt_limit}x).', 'error')
+                return redirect(url_for('course_detail', course_id=course_id))
+        
         correct = 0
         total = len(qs)
         for q in qs:
@@ -2165,7 +2321,9 @@ def take_quiz(course_id):
             if ch and ch.is_correct:
                 correct += 1
         score = int((correct/total)*100) if total else 0
-        passed = score >= 60
+        # Use dynamic passing_grade instead of hardcoded 60
+        passing_grade = c.passing_grade if c.passing_grade else 100
+        passed = score >= passing_grade
         att = Attempt(user_id=current_user.id, course_id=course_id, score=score, passed=passed)
         db.session.add(att)
         db.session.commit()
@@ -2176,7 +2334,7 @@ def take_quiz(course_id):
     for q in qs:
         choices = Choice.query.filter_by(question_id=q.id).all()
         data.append({'id': q.id, 'text': q.text, 'choices': choices})
-    return render_template('quiz.html', course=c, questions=data)
+    return render_template('quiz.html', course=c, questions=data, remaining_attempts=remaining_attempts)
 
 @app.route('/course/<int:course_id>/certificate/download')
 @login_required
@@ -2203,8 +2361,9 @@ def download_certificate(course_id):
         flash('Tidak ada latihan yang ditentukan untuk kursus ini, sehingga penyelesaian latihan tidak diperlukan untuk sertifikat.', 'info')
 
     attempt = Attempt.query.filter_by(user_id=current_user.id, course_id=course_id).order_by(Attempt.id.desc()).first()
-    if not attempt or attempt.score < 100:
-        flash('Dapatkan skor 100 pada kuis terlebih dahulu sebelum mengunduh sertifikat.', 'error')
+    passing_grade = course.passing_grade if course.passing_grade else 100
+    if not attempt or attempt.score < passing_grade:
+        flash(f'Dapatkan skor minimal {passing_grade} pada kuis terlebih dahulu sebelum mengunduh sertifikat.', 'error')
         return redirect(url_for('course_detail', course_id=course_id))
 
     # Check for all lessons completed

@@ -66,7 +66,11 @@
     });
 
     quizForm.addEventListener('submit', function(event) {
-      const confirmed = confirm('Apakah Anda yakin ingin menyimpan jawaban? Kuis hanya dapat disubmit satu kali.');
+      {% if course.attempt_limit > 0 %}
+      const confirmed = confirm('Apakah Anda yakin ingin menyimpan jawaban? Sisa {{ remaining_attempts }} kali lagi.');
+      {% else %}
+      const confirmed = confirm('Apakah Anda yakin ingin menyimpan jawaban?');
+      {% endif %}
       if (!confirmed) {
         event.preventDefault();
         return;
