@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 80px auto; padding: 20px; text-align: center;">
+    <div class="card"
+        style="border: 1px solid #ddd; border-radius: 12px; padding: 50px 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background: white;">
+        <div style="margin-bottom: 30px;">
+            <div
+                style="width: 100px; height: 100px; margin: 0 auto 20px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(40,167,69,0.3);">
+                <svg style="width: 60px; height: 60px; color: white;" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <h1 style="color: #28a745; margin: 0 0 10px 0; font-size: 32px;">Pembayaran Berhasil!</h1>
+            <p style="color: #6c757d; margin: 0; font-size: 16px;">Terima kasih atas pembayaran Anda</p>
+        </div>
+
+        {% if payment %}
+        <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 30px 0; text-align: left;">
+            <div
+                style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #6c757d;">Order ID:</span>
+                <strong style="color: #333;">{{ payment.order_id }}</strong>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #6c757d;">Metode Pembayaran:</span>
+                <strong style="color: #333;">
+                    {% if payment.payment_type %}
+                        {{ payment.payment_type.replace('_', ' ').title() }}
+                    {% else %}
+                        {% if payment.order_id.startswith('CART-') %}
+                            Midtrans (Pending)
+                        {% else %}
+                            Saldo
+                        {% endif %}
+                    {% endif %}
+                </strong>
+            </div>
+            {% if payment.order_id.startswith('CART-') %}
+            <div style="padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #6c757d;">Items:</span>
+                <div style="margin-top:6px;">
+                    {% if payment.cart_courses %}
+                        <ul style="margin:0; padding-left: 18px; color: #333;">
+                        {% for c in payment.cart_courses %}
+                            <li>{{ c.title }}</li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        {% set pdata = None %}
+                        {% if payment.payment_data %}
+                            {% set pdata = None %}
+                            {# try to load JSON-safe via Jinja is messy; fallback to raw string list if present #}
+                        {% endif %}
+                        {% if pdata and pdata.course_titles %}
+                            <ul style="margin:0; padding-left: 18px; color: #333;">
+                            {% for t in pdata.course_titles %}
+                                <li>{{ t }}</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div style="color:#333;">Multiple courses</div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div
+                style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #6c757d;">Course:</span>
+                <strong style="color: #333;">{{ payment.course.title if payment.course else 'N/A' }}</strong>
+            </div>
+            {% endif %}
+
+            <div
+                style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+                <span style="color: #6c757d;">Total Bayar:</span>
+                <strong style="color: #28a745; font-size: 18px;">Rp {{ "{:,.0f}".format(payment.gross_amount)
+                    }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0;">
+                <span style="color: #6c757d;">Status:</span>
+                <span
+                    style="background: #28a745; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;">LUNAS</span>
+            </div>
+        </div>
+
+        <p style="color: #666; margin: 20px 0; line-height: 1.6;">
+            {% if payment.order_id.startswith('CART-') %}
+                Selamat! Pembayaran untuk kursus yang dibeli berhasil. Anda dapat mengakses semua kursus di
+                <strong>{{ url_for('my_courses')|safe }}</strong> atau klik tombol "Kursus Saya" di bawah.
+            {% else %}
+                Selamat! Anda sekarang sudah terdaftar di course <strong>{{ payment.course.title if payment.course else
+                'ini' }}</strong>.
+                Silakan mulai belajar dan selesaikan semua materi untuk mendapatkan sertifikat.
+            {% endif %}
+        </p>
+
+        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+            <a href="{{ url_for('course_detail', course_id=payment.course_id) if payment else url_for('courses') }}"
+                style="background: #007bff; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; transition: all 0.3s; display: inline-block;">
+                🚀 Mulai Belajar
+            </a>
+            <a href="{{ url_for('my_courses') }}"
+                style="background: #6c757d; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; transition: all 0.3s; display: inline-block;">
+                📚 Kursus Saya
+            </a>
+        </div>
+        {% else %}
+        <p style="color: #dc3545; margin: 20px 0;">Data pembayaran tidak ditemukan.</p>
+        <a href="{{ url_for('courses') }}"
+            style="background: #007bff; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; transition: all 0.3s; display: inline-block;">
+            Lihat Kursus
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    a[style*="background: #007bff"]:hover {
+        background: #0056b3 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    }
+
+    a[style*="background: #6c757d"]:hover {
+        background: #5a6268 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+    }
+</style>
+{% endblock %}

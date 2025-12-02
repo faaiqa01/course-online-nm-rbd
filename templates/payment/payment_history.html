@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 40px auto; padding: 20px;">
+    <div style="margin-bottom: 30px;">
+        <h1 style="color: #333; margin: 0 0 10px 0;">Riwayat Pembayaran</h1>
+        <p style="color: #6c757d; margin: 0;">Lihat semua transaksi pembayaran course Anda</p>
+    </div>
+
+    {% if payments %}
+    <div class="table-responsive"
+        style="background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; min-width: 900px;">
+            <thead style="background: #111827; color: white;">
+                <tr>
+                    <th style="padding: 15px; text-align: left; font-weight: 600; min-width: 150px;">Order ID</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 600; min-width: 200px;">Course</th>
+                    <th style="padding: 15px; text-align: right; font-weight: 600; min-width: 120px;">Jumlah</th>
+                    <th style="padding: 15px; text-align: center; font-weight: 600; min-width: 100px;">Metode</th>
+                    <th style="padding: 15px; text-align: center; font-weight: 600; min-width: 100px;">Status</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 600; min-width: 150px;">Tanggal</th>
+                    <th style="padding: 15px; text-align: center; font-weight: 600; min-width: 150px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr style="border-bottom: 1px solid #f0f0f0; transition: background 0.2s;">
+                    <td style="padding: 15px; color: #666; font-family: monospace; font-size: 12px;">{{ payment.order_id
+                        }}</td>
+                    <td style="padding: 15px;">
+                        {% if payment.order_id.startswith('CART-') %}
+                        <strong style="color: #333; display: block; margin-bottom: 4px;">
+                            📦 Cart Checkout
+                        </strong>
+                        <small style="color: #999;">
+                            {% if payment.cart_courses %}
+                            {% for course in payment.cart_courses[:2] %}
+                            {{ course.title }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                            {% if payment.cart_courses|length > 2 %}
+                            + {{ payment.cart_courses|length - 2 }} lainnya
+                            {% endif %}
+                            {% else %}
+                            {{ payment.course_count }} course(s)
+                            {% endif %}
+                        </small>
+                        {% else %}
+                        <strong style="color: #333; display: block; margin-bottom: 4px;">{{ payment.course.title if
+                            payment.course else 'N/A' }}</strong>
+                        {% if payment.course and payment.course.instructor %}
+                        <small style="color: #999;">by {{ payment.course.instructor.name }}</small>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                    <td style="padding: 15px; text-align: right; color: #28a745; font-weight: bold;">
+                        Rp {{ "{:,.0f}".format(payment.gross_amount) }}
+                    </td>
+                    <td style="padding: 15px; text-align: center;">
+                        {% if payment.payment_type %}
+                        <span
+                            style="background: #e7f3ff; color: #007bff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; white-space: nowrap; display: inline-block;">
+                            {{ payment.payment_type.replace('_', ' ').title() }}
+                        </span>
+                        {% else %}
+                        <span style="color: #999;">-</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 15px; text-align: center;">
+                        {% if payment.transaction_status == 'settlement' %}
+                        <span
+                            style="background: #d4edda; color: #155724; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; display: inline-block;">
+                            ✓ Berhasil
+                        </span>
+                        {% elif payment.transaction_status == 'pending' %}
+                        <span
+                            style="background: #fff3cd; color: #856404; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; display: inline-block;">
+                            ⏳ Pending
+                        </span>
+                        {% elif payment.transaction_status in ['cancel', 'deny', 'expire'] %}
+                        <span
+                            style="background: #f8d7da; color: #721c24; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; display: inline-block;">
+                            ✗ {{ payment.transaction_status.title() }}
+                        </span>
+                        {% else %}
+                        <span
+                            style="background: #e2e3e5; color: #383d41; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; display: inline-block;">
+                            {{ payment.transaction_status or 'Unknown' }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 15px; color: #666; font-size: 14px;">
+                        {{ payment.created_at.strftime('%d %b %Y %H:%M') if payment.created_at else '-' }}
+                    </td>
+                    <td style="padding: 15px; text-align: center;">
+                        {% if payment.transaction_status in ['pending', 'expire'] %}
+                        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap;">
+                            <a href="{{ url_for('payment.payment_invoice', order_id=payment.order_id) }}"
+                                target="_blank" rel="noopener"
+                                style="background: #17a2b8; color: white; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">
+                                🧾 Lihat Nota
+                            </a>
+                            <button onclick="deletePayment('{{ payment.order_id }}')"
+                                style="background: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s; white-space: nowrap;"
+                                title="Hapus record pembayaran yang gagal">
+                                🗑️
+                            </button>
+                        </div>
+                        {% elif payment.transaction_status == 'settlement' %}
+                        <div style="display:flex; gap:8px; justify-content:center;">
+                            <a href="{{ url_for('payment.payment_success') }}?order_id={{ payment.order_id }}"
+                                target="_blank" rel="noopener"
+                                style="background: #17a2b8; color: white; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">
+                                🧾 Lihat Nota
+                            </a>
+                        </div>
+                        {% else %}
+                        <span style="color: #999; font-size: 12px;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if payments|length == 0 %}
+    <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 8px; margin-top: 20px;">
+        <div style="font-size: 80px; color: #dee2e6; margin-bottom: 20px;">💳</div>
+        <h3 style="color: #6c757d; margin: 0 0 10px 0;">Belum Ada Transaksi</h3>
+        <p style="color: #999; margin: 0 0 25px 0;">Anda belum melakukan pembayaran untuk course premium</p>
+        <a href="{{ url_for('courses') }}"
+            style="background: #007bff; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; display: inline-block; transition: all 0.3s;">
+            Lihat Course Premium
+        </a>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 8px;">
+        <div style="font-size: 80px; color: #dee2e6; margin-bottom: 20px;">💳</div>
+        <h3 style="color: #6c757d; margin: 0 0 10px 0;">Belum Ada Transaksi</h3>
+        <p style="color: #999; margin: 0 0 25px 0;">Anda belum melakukan pembayaran untuk course premium</p>
+        <a href="{{ url_for('courses') }}"
+            style="background: #007bff; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; display: inline-block; transition: all 0.3s;">
+            Lihat Course Premium
+        </a>
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 30px; text-align: center;">
+        <a href="{{ url_for('my_courses') }}" style="color: #6c757d; text-decoration: none;">← Kembali ke Kursus
+            Saya</a>
+    </div>
+</div>
+
+<style>
+    tbody tr:hover {
+        background: #f8f9fa !important;
+    }
+
+    a[style*="background: #007bff"]:hover {
+        background: #0056b3 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    }
+</style>
+<script>
+    function checkStatus(orderId) {
+        if (!confirm('Cek status pembayaran sekarang?')) return;
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = 'Checking...';
+        btn.disabled = true;
+
+        fetch(`/payment/check-status/${orderId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert('Gagal: ' + data.message);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+                btn.innerText = originalText;
+                btn.disabled = false;
+            });
+    }
+
+    function deletePayment(orderId) {
+        if (!confirm('Hapus record pembayaran ini? Aksi ini tidak bisa dibatalkan.')) return;
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = 'Menghapus...';
+        btn.disabled = true;
+
+        fetch(`/payment/delete/${orderId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Record pembayaran berhasil dihapus');
+                    window.location.reload();
+                } else {
+                    alert('Gagal menghapus: ' + data.message);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+                btn.innerText = originalText;
+                btn.disabled = false;
+            });
+    }
+</script>
+{% endblock %}

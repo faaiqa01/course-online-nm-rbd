@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 50px auto; padding: 20px;">
+    <div class="card" style="border: 1px solid #ddd; border-radius: 8px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div class="card-header" style="border-bottom: 2px solid #007bff; padding-bottom: 15px; margin-bottom: 25px;">
+            <h2 style="color: #007bff; margin: 0;">Checkout Course</h2>
+        </div>
+        <div class="card-body">
+            <div class="row" style="display: flex; gap: 30px;">
+                <div class="col-md-4" style="flex: 1; max-width: 250px;">
+                    {% if course.thumbnail_path %}
+                        {% if course.thumbnail_path.startswith('http') %}
+                            <img src="{{ course.thumbnail_path }}" class="img-fluid" style="width: 100%; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);" alt="{{ course.title }}">
+                        {% else %}
+                            <img src="{{ url_for('static', filename=course.thumbnail_path) }}" class="img-fluid" style="width: 100%; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);" alt="{{ course.title }}">
+                        {% endif %}
+                    {% else %}
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 150px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                            <span style="color: white; font-size: 50px;">📚</span>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-8" style="flex: 2;">
+                    <h3 style="color: #333; margin-bottom: 15px;">{{ course.title }}</h3>
+                    <p style="color: #666; line-height: 1.6; margin-bottom: 15px;">{{ course.description[:200] }}{% if course.description|length > 200 %}...{% endif %}</p>
+                    
+                    <div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0 0 8px 0; color: #666;"><strong>Instruktur:</strong> {{ course.instructor.name if course.instructor else 'N/A' }}</p>
+                        <p style="margin: 0; color: #666;"><strong>Status:</strong> <span style="color: #dc3545;">Premium</span></p>
+                    </div>
+                    
+                    <hr style="border: none; border-top: 1px solid #dee2e6; margin: 25px 0;">
+                    
+                    <div style="display: flex;justify-content: space-between; align-items: center; margin-top: 20px;">
+                        <div>
+                            <p style="margin: 0; color: #666; font-size: 14px;">Total Pembayaran:</p>
+                            <h2 style="color: #28a745; margin: 5px 0 0 0;">Rp {{ "{:,.0f}".format(course.price) }}</h2>
+                        </div>
+                        <button id="pay-button" class="btn btn-primary" style="background: #007bff; color: white; border: none; padding: 15px 40px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.3s;">
+                            <i class="fas fa-credit-card"></i> Bayar Sekarang
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px; text-align: center;">
+        <a href="{{ url_for('course_detail', course_id=course.id) }}" style="color: #6c757d; text-decoration: none;">← Kembali ke Detail Course</a>
+    </div>
+</div>
+
+<!-- Midtrans Snap.js -->
+<script type="text/javascript"
+    src="https://app.sandbox.midtrans.com/snap/snap.js"
+    data-client-key="{{ midtrans_client_key }}">
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const payButton = document.getElementById('pay-button');
+        
+        payButton.addEventListener('click', function () {
+            // Disable button to prevent double click
+            payButton.disabled = true;
+            payButton.innerHTML = '<span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite;"></span> Memproses...';
+            
+            // Create transaction
+            fetch("{{ url_for('payment.create_transaction', course_id=course.id) }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Open Midtrans Snap popup
+                    window.snap.pay(data.snap_token, {
+                        onSuccess: function(result) {
+                            console.log('Payment success:', result);
+                            window.location.href = "{{ url_for('payment.payment_success') }}?order_id=" + data.order_id;
+                        },
+                        onPending: function(result) {
+                            console.log('Payment pending:', result);
+                            alert('Menunggu pembayaran Anda! Silakan selesaikan pembayaran.');
+                            window.location.href = "{{ url_for('payment.payment_history') }}";
+                        },
+                        onError: function(result) {
+                            console.log('Payment error:', result);
+                            alert('Pembayaran gagal! Silakan coba lagi.');
+                            payButton.disabled = false;
+                            payButton.innerHTML = '<i class="fas fa-credit-card"></i> Bayar Sekarang';
+                        },
+                                onClose: function() {
+                                    console.log('Customer closed the popup without finishing payment');
+                                    // Mark the payment as failed on server
+                                    fetch('/payment/mark-failed/' + data.order_id, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+                                    .then(r => r.json()).then(res => {
+                                        alert(res && res.success ? 'Pembayaran dibatalkan.' : (res.message || 'Pembayaran dibatalkan.'));
+                                        payButton.disabled = false;
+                                        payButton.innerHTML = '<i class="fas fa-credit-card"></i> Bayar Sekarang';
+                                    }).catch(err => {
+                                        alert('Anda menutup popup pembayaran. Silakan coba lagi jika ingin melanjutkan.');
+                                        payButton.disabled = false;
+                                        payButton.innerHTML = '<i class="fas fa-credit-card"></i> Bayar Sekarang';
+                                    });
+                                }
+                    });
+                } else {
+                    alert('Error: ' + data.message);
+                    payButton.disabled = false;
+                    payButton.innerHTML = '<i class="fas fa-credit-card"></i> Bayar Sekarang';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan! Silakan coba lagi.');
+                payButton.disabled = false;
+                payButton.innerHTML = '<i class="fas fa-credit-card"></i> Bayar Sekarang';
+            });
+        });
+    });
+</script>
+
+<style>
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    #pay-button:hover:not(:disabled) {
+        background: #0056b3 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+    }
+    
+    #pay-button:disabled {
+        background: #6c757d !important;
+        cursor:default !important;
+    }
+</style>
+{% endblock %}
