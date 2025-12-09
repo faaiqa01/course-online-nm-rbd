@@ -9,10 +9,10 @@
                 <div style="color:#6c757d; font-size:14px;">Order ID: <strong>{{ payment.order_id }}</strong></div>
                 <div id="countdown" style="color:#dc3545; font-size:14px; margin-top:6px;">
                     {% if expiry_iso %}
-                            Sisa waktu: <span id="countdown-timer">-</span>
-                        {% else %}
-                            &nbsp;
-                        {% endif %}
+                    Sisa waktu: <span id="countdown-timer">-</span>
+                    {% else %}
+                    &nbsp;
+                    {% endif %}
                 </div>
             </div>
             <div style="text-align:right;">
@@ -23,41 +23,53 @@
 
         <div style="border-top:1px solid #eee; padding-top: 12px; margin-top:8px;">
             {% if payment.order_id.startswith('CART-') %}
-                <div style="margin-bottom:8px; color:#6c757d;">Items</div>
-                {% if payment.cart_courses %}
-                    <ul style="margin:0 0 12px 18px; padding:0; color:#333;">
-                        {% for c in payment.cart_courses %}
-                        <li>{{ c.title }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    {# Try to show titles saved in payment_data if available. Avoid using unsupported try/except tags in Jinja. #}
-                    {% set raw = payment.payment_data %}
-                    {% if raw is mapping and raw.get('course_titles') %}
-                        <ul style="margin:0 0 12px 18px; padding:0; color:#333;">
-                        {% for t in raw.get('course_titles') %}
-                            <li>{{ t }}</li>
-                        {% endfor %}
-                        </ul>
-                    {% else %}
-                        <div style="color:#333; margin-bottom:12px;">Multiple courses</div>
-                    {% endif %}
-                {% endif %}
+            <div style="margin-bottom:8px; color:#6c757d;">Items</div>
+            {% if payment.cart_courses %}
+            <ul style="margin:0 0 12px 18px; padding:0; color:#333;">
+                {% for c in payment.cart_courses %}
+                <li>{{ c.title }}</li>
+                {% endfor %}
+            </ul>
             {% else %}
-                <div style="margin-bottom:8px; color:#6c757d;">Course</div>
-                <div style="color:#333; margin-bottom:12px;"><strong>{{ payment.course.title if payment.course else 'N/A' }}</strong></div>
+            {# Try to show titles saved in payment_data if available. Avoid using unsupported try/except tags in Jinja.
+            #}
+            {% set raw = payment.payment_data %}
+            {% if raw is mapping and raw.get('course_titles') %}
+            <ul style="margin:0 0 12px 18px; padding:0; color:#333;">
+                {% for t in raw.get('course_titles') %}
+                <li>{{ t }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div style="color:#333; margin-bottom:12px;">Multiple courses</div>
+            {% endif %}
+            {% endif %}
+            {% else %}
+            <div style="margin-bottom:8px; color:#6c757d;">Course</div>
+            <div style="color:#333; margin-bottom:12px;"><strong>{{ payment.course.title if payment.course else 'N/A'
+                    }}</strong></div>
             {% endif %}
 
-            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #eee; padding-top:12px;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #eee; padding-top:12px;">
                 <div style="color:#6c757d;">Total Bayar</div>
                 <div style="color:#28a745; font-weight:700;">Rp {{ "{:,.0f}".format(payment.gross_amount) }}</div>
             </div>
 
             <div style="margin-top:18px; text-align:center;">
                 {% if payment.transaction_status == 'pending' %}
-                    <button id="pay-now" type="button" style="background:#007bff;color:white;border:none;padding:12px 28px;border-radius:8px;font-size:16px;">Bayar Sekarang</button>
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                    <button id="pay-now" type="button"
+                        style="background:#007bff;color:white;border:none;padding:12px 28px;border-radius:8px;font-size:16px;cursor:pointer;">Bayar
+                        Sekarang</button>
+                    <button id="check-status" type="button"
+                        style="background:#28a745;color:white;border:none;padding:12px 28px;border-radius:8px;font-size:16px;cursor:pointer;">🔄
+                        Cek Status</button>
+                </div>
                 {% else %}
-                    <a href="{{ url_for('payment.payment_success') }}?order_id={{ payment.order_id }}" class="btn" style="background:#17a2b8;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;">Lihat Nota Selesai</a>
+                <a href="{{ url_for('payment.payment_success') }}?order_id={{ payment.order_id }}" class="btn"
+                    style="background:#17a2b8;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;">Lihat
+                    Nota Selesai</a>
                 {% endif %}
             </div>
         </div>
@@ -67,88 +79,126 @@
 {% if payment.transaction_status == 'pending' %}
 <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ midtrans_client_key }}"></script>
 <script>
-document.getElementById('pay-now').addEventListener('click', function(){
-    const btn = this;
-    const originalText = btn.innerText || 'Bayar Sekarang';
-    btn.disabled = true;
-    btn.innerText = 'Membuat transaksi...';
+    document.getElementById('pay-now').addEventListener('click', function () {
+        const btn = this;
+        const originalText = btn.innerText || 'Bayar Sekarang';
+        btn.disabled = true;
+        btn.innerText = 'Membuat transaksi...';
 
-    fetch('/payment/retry/{{ payment.order_id }}', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success && data.snap_token) {
-            // Do NOT update the displayed countdown here — keep the original invoice expiry running.
-            // The retry creates a separate transaction; we keep showing the original payment's remaining time.
-            window.snap.pay(data.snap_token, {
-                onSuccess: function(result){ window.location.href = '/payment/success?order_id=' + data.order_id; },
-                onPending: function(result){ window.location.href = '/payment/history'; },
-                onError: function(result){
-                    // re-enable button in case of immediate error
+        fetch('/payment/retry/{{ payment.order_id }}', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.snap_token) {
+                    // Do NOT update the displayed countdown here — keep the original invoice expiry running.
+                    // The retry creates a separate transaction; we keep showing the original payment's remaining time.
+                    window.snap.pay(data.snap_token, {
+                        onSuccess: function (result) { window.location.href = '/payment/success?order_id=' + data.order_id; },
+                        onPending: function (result) { window.location.href = '/payment/history'; },
+                        onError: function (result) {
+                            // re-enable button in case of immediate error
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                            alert('Pembayaran gagal.');
+                            window.location.href = '/cart';
+                        },
+                        onClose: function () {
+                            // User closed popup — mark payment as failed on server and restore button
+                            fetch('/payment/mark-failed/{{ payment.order_id }}', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+                                .then(r => r.json()).then(res => {
+                                    // ignore result, just inform user
+                                    btn.disabled = false;
+                                    btn.innerText = originalText;
+                                    alert(res && res.success ? 'Pembayaran dibatalkan.' : (res.message || 'Pembayaran dibatalkan.'));
+                                }).catch(err => {
+                                    btn.disabled = false;
+                                    btn.innerText = originalText;
+                                    alert('Anda menutup popup pembayaran. Cek Riwayat Pembayaran.');
+                                });
+                        }
+                    });
+                } else {
+                    alert(data.message || 'Gagal membuat transaksi');
                     btn.disabled = false;
                     btn.innerText = originalText;
-                    alert('Pembayaran gagal.');
-                    window.location.href = '/cart';
-                },
-                onClose: function(){
-                    // User closed popup — mark payment as failed on server and restore button
-                    fetch('/payment/mark-failed/{{ payment.order_id }}', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-                    .then(r => r.json()).then(res => {
-                        // ignore result, just inform user
-                        btn.disabled = false;
-                        btn.innerText = originalText;
-                        alert(res && res.success ? 'Pembayaran dibatalkan.' : (res.message || 'Pembayaran dibatalkan.'));
-                    }).catch(err => {
-                        btn.disabled = false;
-                        btn.innerText = originalText;
-                        alert('Anda menutup popup pembayaran. Cek Riwayat Pembayaran.');
-                    });
                 }
+            }).catch(function (err) {
+                alert('Error: ' + err);
+                btn.disabled = false;
+                btn.innerText = originalText;
             });
-        } else {
-            alert(data.message || 'Gagal membuat transaksi');
-            btn.disabled = false;
-            btn.innerText = originalText;
-        }
-    }).catch(function(err){
-        alert('Error: ' + err);
-        btn.disabled = false;
-        btn.innerText = originalText;
     });
-});
 
-// Countdown helper
-function startCountdown(expiryIso) {
-    try {
-        if (!expiryIso) return;
-        // Ensure we treat time as UTC
-        let iso = expiryIso;
-        if (!iso.endsWith('Z')) iso = iso + 'Z';
-        const end = new Date(iso).getTime();
-        const el = document.getElementById('countdown-timer');
-        if (!el) return;
-        function update() {
-            const now = Date.now();
-            let diff = Math.max(0, end - now);
-            const hrs = Math.floor(diff / (1000*60*60));
-            diff -= hrs * (1000*60*60);
-            const mins = Math.floor(diff / (1000*60));
-            diff -= mins * (1000*60);
-            const secs = Math.floor(diff / 1000);
-            el.innerText = String(hrs).padStart(2,'0') + ':' + String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
-            if (end <= Date.now()) {
-                clearInterval(timerInterval);
+    // Add event listener for check status button
+    document.getElementById('check-status').addEventListener('click', function () {
+        if (!confirm('Periksa status pembayaran sekarang dari Midtrans?')) return;
+
+        const btn = this;
+        const originalText = btn.innerText || '🔄 Cek Status';
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Checking...';
+
+        fetch('/payment/check-status/{{ payment.order_id }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || 'Status berhasil diperbarui!');
+                    if (data.status === 'settlement') {
+                        // Redirect to success page if payment is settled
+                        window.location.href = '/payment/success?order_id={{ payment.order_id }}';
+                    } else {
+                        // Reload page to show updated status
+                        window.location.reload();
+                    }
+                } else {
+                    alert('Gagal: ' + (data.message || 'Tidak dapat mengecek status'));
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    });
+
+
+    // Countdown helper
+    function startCountdown(expiryIso) {
+        try {
+            if (!expiryIso) return;
+            // Ensure we treat time as UTC
+            let iso = expiryIso;
+            if (!iso.endsWith('Z')) iso = iso + 'Z';
+            const end = new Date(iso).getTime();
+            const el = document.getElementById('countdown-timer');
+            if (!el) return;
+            function update() {
+                const now = Date.now();
+                let diff = Math.max(0, end - now);
+                const hrs = Math.floor(diff / (1000 * 60 * 60));
+                diff -= hrs * (1000 * 60 * 60);
+                const mins = Math.floor(diff / (1000 * 60));
+                diff -= mins * (1000 * 60);
+                const secs = Math.floor(diff / 1000);
+                el.innerText = String(hrs).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+                if (end <= Date.now()) {
+                    clearInterval(timerInterval);
+                }
             }
-        }
-        update();
-        const timerInterval = setInterval(update, 1000);
-    } catch (e) { console.error(e); }
-}
+            update();
+            const timerInterval = setInterval(update, 1000);
+        } catch (e) { console.error(e); }
+    }
 
-// init countdown from server-rendered expiry if present
-document.addEventListener('DOMContentLoaded', function(){
-    const initialExpiry = "{{ expiry_iso or '' }}";
-    if (initialExpiry) startCountdown(initialExpiry);
-});
+    // init countdown from server-rendered expiry if present
+    document.addEventListener('DOMContentLoaded', function () {
+        const initialExpiry = "{{ expiry_iso or '' }}";
+        if (initialExpiry) startCountdown(initialExpiry);
+    });
 </script>
 {% endif %}
 
