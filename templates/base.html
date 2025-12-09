@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title or "Online Course" }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
   <div class="nav">
     <button type="button" class="nav-brand" id="aboutTrigger"><strong>TechNova Academy</strong></button>
@@ -14,35 +16,37 @@
     <a href="{{ url_for('courses') }}">Lihat Kursus</a>
     {% endif %}
     {% if current_user.is_authenticated and current_user.role == 'student' %}
-      <a href="{{ url_for('my_courses') }}">Kursus Saya</a>
-      <a href="{{ url_for('cart') }}">Keranjang</a>
-      <a href="{{ url_for('ai_chat_page') }}">Asisten AI</a>
+    <a href="{{ url_for('my_courses') }}">Kursus Saya</a>
+    <a href="{{ url_for('payment.payment_history') }}">Riwayat Pembayaran</a>
+    <a href="{{ url_for('cart') }}">Keranjang</a>
+    <a href="{{ url_for('ai_chat_page') }}">Asisten AI</a>
     {% endif %}
     {% if current_user.is_authenticated %}
-      {% if current_user.role == 'instructor' and current_user.is_verified %}
-        <a href="{{ url_for('instructor_dashboard') }}">Instructor</a>
-        <a href="{{ url_for('ai_chat_page') }}">Asisten AI</a>
-      {% endif %}
-      <div class="dropdown" style="margin-left:auto;">
-        <button class="dropdown-toggle">Hi, {{ current_user.name }} ({{ current_user.role }})</button>
-        <div class="dropdown-menu">
-          <a href="{{ url_for('profile') }}">Profile</a>
-          <a href="{{ url_for('logout') }}">Logout</a>
-        </div>
+    {% if current_user.role == 'instructor' and current_user.is_verified %}
+    <a href="{{ url_for('instructor_dashboard') }}">Instructor</a>
+    <a href="{{ url_for('ai_chat_page') }}">Asisten AI</a>
+    {% endif %}
+    <div class="dropdown" style="margin-left:auto;">
+      <button class="dropdown-toggle">Hi, {{ current_user.name }} ({{ current_user.role }})</button>
+      <div class="dropdown-menu">
+        <a href="{{ url_for('profile') }}">Profile</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
       </div>
+    </div>
     {% else %}
-      <span style="margin-left:auto;"></span>
-      <a href="{{ url_for('login') }}">Login</a>
-      <a href="{{ url_for('register') }}" style="margin-left:12px;">Register</a>
+    <span style="margin-left:auto;"></span>
+    <a href="{{ url_for('login') }}">Login</a>
+    <a href="{{ url_for('register') }}" style="margin-left:12px;">Register</a>
     {% endif %}
   </div>
   <div class="container">
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert {{ 'success' if category=='success' else 'error' if category=='error' else '' }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert {{ 'success' if category=='success' else 'error' if category=='error' else '' }}">{{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
   </div>
@@ -51,8 +55,10 @@
     <div class="about-modal" role="document">
       <button type="button" class="about-modal-close" id="aboutClose" aria-label="Tutup penjelasan platform">×</button>
       <h2>Tentang TechNova Academy</h2>
-      <p>TechNova Academy adalah layanan kursus online yang berfokus pada penguasaan Microsoft Office untuk kebutuhan profesional dan akademik.</p>
-      <p>Kami menyediakan pembelajaran modular, latihan praktis, serta dukungan mentor yang membantu Anda memanfaatkan Word, Excel, dan PowerPoint secara optimal.</p>
+      <p>TechNova Academy adalah layanan kursus online yang berfokus pada penguasaan Microsoft Office untuk kebutuhan
+        profesional dan akademik.</p>
+      <p>Kami menyediakan pembelajaran modular, latihan praktis, serta dukungan mentor yang membantu Anda memanfaatkan
+        Word, Excel, dan PowerPoint secara optimal.</p>
       <ul>
         <li>Materi terstruktur dari dasar hingga lanjutan dengan contoh nyata.</li>
         <li>Latihan interaktif dan kuis untuk mengukur pemahaman Anda.</li>
@@ -61,7 +67,8 @@
       </ul>
       <p>Bergabunglah dan bangun keahlian Microsoft Office Anda bersama TechNova Academy.</p>
       <div class="about-social-links">
-        <a href="https://www.instagram.com/technova.course?igsh=MWppb3BpZjIwcmY0Mw==" target="_blank" rel="noopener noreferrer">
+        <a href="https://www.instagram.com/technova.course?igsh=MWppb3BpZjIwcmY0Mw==" target="_blank"
+          rel="noopener noreferrer">
           <img src="{{ url_for('static', filename='images/Instagram_icon.png') }}" alt="Instagram TechNova Academy">
           <span>Ikuti kami di Instagram</span>
         </a>
@@ -72,84 +79,84 @@
       </div>
     </div>
   </div>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var dropdownToggle = document.querySelector('.dropdown-toggle');
-    if (dropdownToggle) {
-        dropdownToggle.addEventListener('click', function(event) {
-            event.stopPropagation();
-            var dropdownMenu = this.nextElementSibling;
-            dropdownMenu.classList.toggle('show');
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var dropdownToggle = document.querySelector('.dropdown-toggle');
+      if (dropdownToggle) {
+        dropdownToggle.addEventListener('click', function (event) {
+          event.stopPropagation();
+          var dropdownMenu = this.nextElementSibling;
+          dropdownMenu.classList.toggle('show');
         });
-    }
+      }
 
-    var aboutTrigger = document.getElementById('aboutTrigger');
-    var aboutModal = document.getElementById('aboutModal');
-    var aboutClose = document.getElementById('aboutClose');
+      var aboutTrigger = document.getElementById('aboutTrigger');
+      var aboutModal = document.getElementById('aboutModal');
+      var aboutClose = document.getElementById('aboutClose');
 
-    function openAboutModal() {
+      function openAboutModal() {
         if (!aboutModal) {
-            return;
+          return;
         }
         aboutModal.classList.add('is-visible');
         aboutModal.setAttribute('aria-hidden', 'false');
         aboutModal.setAttribute('aria-modal', 'true');
         if (aboutClose) {
-            aboutClose.focus();
+          aboutClose.focus();
         }
-    }
+      }
 
-    function closeAboutModal() {
+      function closeAboutModal() {
         if (!aboutModal) {
-            return;
+          return;
         }
         aboutModal.classList.remove('is-visible');
         aboutModal.setAttribute('aria-hidden', 'true');
         aboutModal.setAttribute('aria-modal', 'false');
         if (aboutTrigger) {
-            aboutTrigger.focus();
+          aboutTrigger.focus();
         }
-    }
+      }
 
-    if (aboutTrigger) {
-        aboutTrigger.addEventListener('click', function(event) {
-            event.preventDefault();
-            openAboutModal();
+      if (aboutTrigger) {
+        aboutTrigger.addEventListener('click', function (event) {
+          event.preventDefault();
+          openAboutModal();
         });
-    }
+      }
 
-    if (aboutClose) {
-        aboutClose.addEventListener('click', function(event) {
-            event.preventDefault();
+      if (aboutClose) {
+        aboutClose.addEventListener('click', function (event) {
+          event.preventDefault();
+          closeAboutModal();
+        });
+      }
+
+      if (aboutModal) {
+        aboutModal.addEventListener('click', function (event) {
+          if (event.target === aboutModal) {
             closeAboutModal();
+          }
         });
-    }
+      }
 
-    if (aboutModal) {
-        aboutModal.addEventListener('click', function(event) {
-            if (event.target === aboutModal) {
-                closeAboutModal();
-            }
-        });
-    }
-
-    document.addEventListener('keydown', function(event) {
+      document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape' && aboutModal && aboutModal.classList.contains('is-visible')) {
-            closeAboutModal();
+          closeAboutModal();
         }
-    });
+      });
 
-    window.addEventListener('click', function(event) {
+      window.addEventListener('click', function (event) {
         var dropdowns = document.getElementsByClassName("dropdown-menu");
         for (var i = 0; i < dropdowns.length; i++) {
-            var openDropdown = dropdowns[i];
-            if (openDropdown.classList.contains('show')) {
-                openDropdown.classList.remove('show');
-            }
+          var openDropdown = dropdowns[i];
+          if (openDropdown.classList.contains('show')) {
+            openDropdown.classList.remove('show');
+          }
         }
+      });
     });
-});
-</script>
+  </script>
 </body>
-</html>
 
+</html>

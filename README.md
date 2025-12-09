@@ -28,6 +28,15 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
 - **Asisten AI Terintegrasi**: Pengguna yang login dapat membuka halaman chatbot (menggunakan OpenRouter API) untuk tanya jawab materi dan bantuan navigasi platform.
 - **Profil Platform Interaktif**: Tombol judul "TechNova Academy" di navigasi menampilkan modal About yang menjelaskan layanan kursus Microsoft Office beserta tautan Instagram dan TikTok.
 - **Lokalisasi**: Antarmuka pengguna sebagian besar telah diterjemahkan ke dalam Bahasa Indonesia.
+- **Integrasi Payment Gateway**: Sistem pembayaran real menggunakan Midtrans dengan support berbagai metode pembayaran (GoPay, OVO, DANA, Bank Transfer, Kartu Kredit, dll).
+- **Manajemen Pembayaran**:
+    - Halaman checkout dengan Snap Midtrans yang aman dan user-friendly.
+    - Invoice digital dengan countdown timer untuk batas waktu pembayaran.
+    - Riwayat pembayaran lengkap dengan detail transaksi.
+    - Retry payment untuk transaksi yang pending atau expired.
+    - Cek status pembayaran manual dari Midtrans.
+- **Silabus Kursus**: Halaman preview silabus yang menampilkan daftar materi sebelum siswa mendaftar kursus.
+- **Manajemen Jadwal Kuis**: Instruktur dapat mengatur tanggal mulai dan akhir kuis untuk mengontrol kapan siswa dapat mengikuti kuis.
 
 ## Teknologi yang Digunakan
 
@@ -35,6 +44,7 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
 - **Database**: MySQL (via `PyMySQL`)
 - **ORM**: Flask-SQLAlchemy
 - **Migrasi Database**: Flask-Migrate (Alembic)
+- **Payment Gateway**: Midtrans (via `midtransclient`)
 - **Manajemen Dependensi**: Pip
 - **Variabel Lingkungan**: python-dotenv
 
@@ -82,6 +92,9 @@ Sistem manajemen pembelajaran (LMS) minimalis yang dibangun dengan Flask dan MyS
     - `SECRET_KEY`: Ganti dengan string acak yang aman.
     - `SQLALCHEMY_DATABASE_URI`: Sesuaikan dengan kredensial database MySQL Anda. Contoh: `mysql+pymysql://root:@127.0.0.1:3306/lms_flask`
     - `FLASK_DEBUG`: Atur ke `True` untuk mode pengembangan.
+    - `MIDTRANS_SERVER_KEY`: Server key dari dashboard Midtrans Anda.
+    - `MIDTRANS_CLIENT_KEY`: Client key dari dashboard Midtrans Anda.
+    - `MIDTRANS_IS_PRODUCTION`: Atur ke `False` untuk sandbox mode, `True` untuk production.
 
 4.  **Instal Dependensi**
     Pastikan `Flask-Migrate` tidak dikomentari di `requirements.txt` untuk mengelola skema database.
@@ -172,6 +185,73 @@ Untuk mengaktifkan chatbot, ikuti langkah berikut:
 > Log chatbot tersimpan di `logs/app.log` dengan sistem rotasi file otomatis.
 
 
+### Konfigurasi Midtrans Payment Gateway
+
+Platform ini menggunakan Midtrans sebagai payment gateway untuk memproses pembayaran kursus premium secara real-time.
+
+#### Fitur Payment Gateway
+
+1. **Metode Pembayaran Lengkap**:
+   - E-Wallet: GoPay, OVO, DANA, LinkAja, ShopeePay
+   - Bank Transfer: BCA, BNI, BRI, Mandiri, Permata
+   - Kartu Kredit/Debit: Visa, Mastercard, JCB
+   - Convenience Store: Indomaret, Alfamart
+   - Cicilan: Kredivo, Akulaku
+
+2. **Keamanan Transaksi**:
+   - Enkripsi SSL/TLS untuk semua transaksi
+   - 3D Secure untuk kartu kredit
+   - Fraud detection system dari Midtrans
+   - Webhook notification untuk update status otomatis
+
+3. **Manajemen Pembayaran**:
+   - Invoice dengan countdown timer (default 24 jam)
+   - Notifikasi real-time status pembayaran
+   - Riwayat transaksi lengkap
+   - Retry payment untuk transaksi pending
+   - Auto-enrollment setelah pembayaran berhasil
+
+#### Cara Mengaktifkan
+
+1. **Daftar Akun Midtrans**:
+   - Kunjungi [https://dashboard.midtrans.com/register](https://dashboard.midtrans.com/register)
+   - Daftar akun baru (gunakan email bisnis jika ada)
+   - Verifikasi email Anda
+
+2. **Dapatkan API Keys**:
+   - Login ke [Midtrans Dashboard](https://dashboard.midtrans.com)
+   - Pilih environment **Sandbox** untuk testing atau **Production** untuk live
+   - Buka menu **Settings** → **Access Keys**
+   - Salin **Server Key** dan **Client Key**
+
+3. **Konfigurasi di `.env`**:
+   ```
+   MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxxxxxxxxxx
+   MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxxxxxxxxxxxxxx
+   MIDTRANS_IS_PRODUCTION=False
+   ```
+
+4. **Testing di Sandbox Mode**:
+   - Gunakan kartu kredit test: `4811 1111 1111 1114`
+   - CVV: `123`, Exp: `01/25`
+   - Untuk e-wallet, gunakan nomor test yang tersedia di [dokumentasi Midtrans](https://docs.midtrans.com/docs/testing-payment-on-sandbox)
+
+#### Detail Teknis
+
+- Payment webhook endpoint: `/payment/notification`
+- Transaksi otomatis expire setelah 24 jam (dapat dikonfigurasi)
+- Status pembayaran: `pending`, `settlement`, `cancel`, `deny`, `expire`
+- Auto-enrollment ke kursus setelah status `settlement`
+- Cart items otomatis terhapus setelah pembayaran berhasil
+- Semua aktivitas tercatat di `logs/app.log`
+
+> **Catatan Penting**: 
+> - Untuk production, pastikan menggunakan HTTPS
+> - Jangan commit API keys ke repository
+> - Gunakan Sandbox mode untuk development dan testing
+> - Webhook URL harus publicly accessible (gunakan ngrok untuk testing lokal)
+
+
 ## Menjalankan Aplikasi
 
 Setelah instalasi selesai, jalankan aplikasi dengan perintah:
@@ -184,16 +264,23 @@ Aplikasi akan berjalan di `http://127.0.0.1:5000`.
 
 1.  Buka aplikasi dan **Daftar** dua akun: satu sebagai **Instruktur**, satu lagi sebagai **Siswa**.
 2.  Masuk sebagai **Instruktur**:
+    - Lengkapi profil instruktur dengan mengunggah sertifikat kredensial.
     - Buka dasbor instruktur.
     - **Buat Kursus** baru (bisa gratis atau premium).
     - Masuk ke detail kursus, lalu tambahkan beberapa **Materi** dan **Soal Kuis**.
+    - Atur **Jadwal Kuis** dengan menentukan tanggal mulai dan akhir.
+    - Kelola **Latihan** untuk kursus (opsional).
 3.  Masuk sebagai **Siswa**:
     - Di halaman utama, klik **Cari Kursus**.
+    - Klik kursus untuk melihat **Silabus** dan detail materi.
     - Untuk kursus gratis, klik **Daftar**.
-    - Untuk kursus premium, klik **Tambah Ke Keranjang**.
-    - Buka menu **Keranjang**, tinjau item, lalu selesaikan "pembayaran" (simulasi).
+    - Untuk kursus premium, klik **Tambah Ke Keranjang** atau **Beli Sekarang**.
+    - Buka menu **Keranjang**, tinjau item, lalu klik **Checkout**.
+    - Pilih metode pembayaran di Midtrans Snap dan selesaikan pembayaran (gunakan test card di sandbox mode).
+    - Setelah pembayaran berhasil, Anda akan diarahkan ke halaman **Invoice**.
     - Buka menu **Kursus Saya** untuk melihat kursus yang sudah terdaftar.
     - Selesaikan semua materi dan ikuti kuis hingga mendapat skor 100 untuk dapat mengunduh **Sertifikat**.
+    - Lihat **Riwayat Pembayaran** untuk melihat semua transaksi Anda.
 4.  Klik label **TechNova Academy** di navigasi untuk membuka modal About yang menjelaskan layanan kursus serta menyediakan tautan Instagram & TikTok.
 5.  Gunakan menu **Asisten AI** (dengan kredensial API yang valid) untuk mendapatkan bantuan materi atau rekomendasi kursus secara instan.
 
@@ -230,17 +317,33 @@ lms_flask_mysql/
 ├── file_pendukung/
 │   └── sertifikat/
 ├── lain/
+├── logs/
+│   └── app.log
 ├── migrations/
 │   ├── alembic.ini
 │   ├── env.py
 │   ├── README
 │   ├── script.py.mako
 │   └── versions/
+├── models/
+│   ├── __init__.py
+│   └── payment.py
+├── routes/
+│   ├── __init__.py
+│   ├── cart_payment_routes.py
+│   └── payment_routes.py
+├── services/
+│   ├── __init__.py
+│   └── midtrans_service.py
 ├── static/
 │   ├── styles.css
+│   ├── images/
 │   └── uploads/
+│       ├── certificates/
+│       └── thumbnails/
 └── templates/
     ├── add_question.html
+    ├── ai_chat.html
     ├── base.html
     ├── cart.html
     ├── certificate.html
@@ -255,12 +358,19 @@ lms_flask_mysql/
     ├── manage_enrollments.html
     ├── manage_exercise.html
     ├── manage_quiz.html
+    ├── manage_quiz_dates.html
     ├── my_courses.html
+    ├── payment/
+    │   ├── checkout.html
+    │   ├── invoice.html
+    │   ├── payment_history.html
+    │   └── success.html
     ├── profile.html
     ├── quiz.html
     ├── register.html
     ├── student_detail_for_instructor.html
-    └── submit_exercise.html
+    ├── submit_exercise.html
+    └── syllabus.html
 ```
 
 ## Panduan Verifikasi Instruktur
@@ -291,8 +401,69 @@ lms_flask_mysql/
 - Aplikasi menulis log rotasi otomatis ke `logs/app.log` (maksimal ±500 KB per file, dengan 5 cadangan). File ini berguna untuk melacak error, aktivitas login, dan panggilan API OpenRouter.
 - Kegagalan konfigurasi chatbot (misal API key kosong) juga dicatat ke log. Periksa file ini ketika tombol Asisten AI hanya menampilkan pesan fallback.
 
+## Panduan Payment Gateway
+
+### Alur Pembayaran
+
+1. **Single Course Checkout**:
+   - Siswa klik tombol "Beli Sekarang" di detail kursus
+   - Diarahkan ke halaman checkout
+   - Klik "Bayar Sekarang" untuk membuka Snap Midtrans
+   - Pilih metode pembayaran dan selesaikan transaksi
+   - Setelah berhasil, otomatis enrolled ke kursus
+
+2. **Cart Checkout**:
+   - Siswa menambahkan beberapa kursus ke keranjang
+   - Buka halaman keranjang dan review items
+   - Klik "Checkout" untuk membuka Snap Midtrans
+   - Pilih metode pembayaran dan selesaikan transaksi
+   - Setelah berhasil, otomatis enrolled ke semua kursus di keranjang
+
+3. **Payment Status**:
+   - `pending`: Menunggu pembayaran
+   - `settlement`: Pembayaran berhasil, enrolled ke kursus
+   - `expire`: Transaksi expired (lewat 24 jam)
+   - `cancel`: Transaksi dibatalkan
+   - `deny`: Transaksi ditolak
+
+### Retry Payment
+
+Jika pembayaran pending atau expired, siswa dapat retry payment:
+1. Buka menu "Riwayat Pembayaran"
+2. Klik invoice dengan status pending/expired
+3. Klik tombol "Bayar Sekarang" untuk retry
+4. Sistem akan membuat order baru dengan suffix `-RETRY-xxxxx`
+
+### Webhook Configuration
+
+Untuk production, konfigurasikan webhook di Midtrans Dashboard:
+1. Login ke Midtrans Dashboard
+2. Buka **Settings** → **Configuration**
+3. Isi **Payment Notification URL**: `https://yourdomain.com/payment/notification`
+4. Isi **Finish Redirect URL**: `https://yourdomain.com/payment/success`
+5. Simpan konfigurasi
+
+### Testing Payment
+
+Gunakan test credentials berikut di Sandbox mode:
+
+**Kartu Kredit (Berhasil)**:
+- Nomor: `4811 1111 1111 1114`
+- CVV: `123`
+- Exp: `01/25`
+
+**GoPay**:
+- Nomor: `081234567890`
+- PIN: `123456`
+
+**Bank Transfer**:
+- Semua bank transfer akan otomatis settlement di sandbox
+
+Lihat [dokumentasi lengkap Midtrans](https://docs.midtrans.com/docs/testing-payment-on-sandbox) untuk test credentials lainnya.
+
 ## Catatan Sinkronisasi Database
 
 - Setelah menarik pembaruan terbaru, jalankan `flask db upgrade` untuk menerapkan migrasi yang tersimpan pada folder `migrations/`.
 - File `DB_SYNC_INSTRUCTIONS.txt` merangkum DDL penting (penambahan harga kursus dan tabel keranjang) bila Anda perlu menerapkannya secara manual.
 - Jika database lama belum memiliki kolom `thumbnail_path`, ikuti panduan pada `fix_thumbnail_column.txt` atau jalankan migrasi terbaru sebelum menggunakan fitur upload thumbnail.
+- **Tabel Payments**: Migrasi terbaru menambahkan tabel `payments` untuk menyimpan data transaksi Midtrans. Pastikan menjalankan `flask db upgrade` setelah pull kode terbaru.

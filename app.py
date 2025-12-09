@@ -4,6 +4,8 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
+from decimal import Decimal
+import json
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -43,6 +45,11 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')  # ganti di
 # Koneksi MySQL Laragon (ubah nama DB/password jika berbeda)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Midtrans Payment Gateway Configuration
+app.config['MIDTRANS_SERVER_KEY'] = os.getenv('MIDTRANS_SERVER_KEY', '')
+app.config['MIDTRANS_CLIENT_KEY'] = os.getenv('MIDTRANS_CLIENT_KEY', '')
+app.config['MIDTRANS_IS_PRODUCTION'] = os.getenv('MIDTRANS_IS_PRODUCTION', 'False').lower() == 'true'
 
 db = SQLAlchemy(app)
 if 'Migrate' in globals() and Migrate:
@@ -202,6 +209,24 @@ PLATFORM_FEATURES_CONTEXT = (
     "Dashboard utama menampilkan ringkasan kursus aktif, progres belajar, dan pintasan menuju tugas atau materi terbaru sesuai peran pengguna. "
     "Menu Lihat Kursus menampilkan katalog lengkap dengan pencarian, filter materi, dan status premium agar pengguna mudah menelusuri program yang tersedia."
 )
+
+def load_knowledge_base(filename: str) -> str:
+    """Load konten file knowledge base dari folder AI/knowledge_base."""
+    try:
+        file_path = Path(app.root_path) / 'AI' / 'knowledge_base' / filename
+        if file_path.exists():
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        else:
+            app.logger.warning(f'Knowledge base file not found: {filename}')
+            return ""
+    except Exception as e:
+        app.logger.error(f'Error loading knowledge base {filename}: {e}')
+        return ""
+
+# Knowledge base loading helper
+def get_knowledge_base_content(filename: str) -> str:
+    return load_knowledge_base(filename)
 
 def build_catalog_context() -> str:
     """Ambil ringkasan kursus untuk dimasukkan ke prompt AI."""
@@ -406,17 +431,35 @@ def build_chat_messages(user_message: str, *, user=None, include_history=True) -
     
     # Role-specific features context
     if getattr(user, 'role', None) == 'student':
-        system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
+        # Inject Student Guides dari file eksternal (Dynamic Load)
+        student_guides = get_knowledge_base_content('student_guides.md')
+        if student_guides:
+            system_message += f"\n\n=== PANDUAN LENGKAP SISWA ===\n{student_guides}\n==============================\n"
+        else:
+            system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
+            
         # Student: tampilkan katalog semua kursus
         catalog_context = build_catalog_context()
         if catalog_context:
             system_message += ' Informasi katalog: ' + catalog_context
+            
     elif getattr(user, 'role', None) == 'instructor':
-        system_message += ' Panduan fitur instruktur: ' + INSTRUCTOR_FEATURES_CONTEXT
+        # Inject Instructor Guides dari file eksternal (Dynamic Load)
+        instructor_guides = get_knowledge_base_content('instructor_guides.md')
+        if instructor_guides:
+            system_message += f"\n\n=== PANDUAN LENGKAP INSTRUKTUR ===\n{instructor_guides}\n==============================\n"
+        else:
+            system_message += ' Panduan fitur instruktur: ' + INSTRUCTOR_FEATURES_CONTEXT
+            
         # Instructor: tampilkan kursus yang mereka buat
         instructor_context = build_instructor_context(user.id)
         if instructor_context:
             system_message += ' Kursus Anda: ' + instructor_context
+
+    # Inject General Guides untuk semua user (Dynamic Load)
+    general_guides = get_knowledge_base_content('general_guides.md')
+    if general_guides:
+        system_message += f"\n\n=== PANDUAN UMUM ===\n{general_guides}\n====================\n"
 
 
     messages = [{'role': 'system', 'content': system_message}]
@@ -704,6 +747,27 @@ class Skill(db.Model):
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
     skill_text = db.Column(db.String(500), nullable=False)
     order_index = db.Column(db.Integer, default=0)
+
+
+class Payment(db.Model):
+    """Payment model for Midtrans transaction tracking"""
+    __tablename__ = 'payments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.String(100), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    gross_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    payment_type = db.Column(db.String(50))
+    transaction_status = db.Column(db.String(50), default='pending')
+    transaction_time = db.Column(db.DateTime)
+    settlement_time = db.Column(db.DateTime)
+    payment_data = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<Payment {self.order_id}>'
 
 
 def ensure_course_thumbnail_column():
@@ -1401,7 +1465,8 @@ def cart():
             entries.append({'item': item, 'course': course})
     subtotal = sum((entry['course'].price or 0) for entry in entries)
     total = subtotal
-    return render_template('cart.html', items=entries, subtotal=subtotal, total=total)
+    return render_template('cart.html', items=entries, subtotal=subtotal, total=total,
+                         midtrans_client_key=app.config.get('MIDTRANS_CLIENT_KEY', ''))
 
 @app.route('/cart/add/<int:course_id>', methods=['POST'])
 @login_required
@@ -1477,6 +1542,10 @@ def remove_from_cart(course_id):
 def checkout_cart():
     if current_user.role != 'student':
         return jsonify({'message': 'Fitur keranjang hanya untuk student.'}), 403
+    # Accept JSON payload with optional payment_method (e.g. 'saldo' or 'midtrans')
+    data = request.get_json(silent=True) or {}
+    payment_method = (data.get('payment_method') or 'saldo').lower()
+
     items = CartItem.query.filter_by(user_id=current_user.id).all()
     if not items:
         return jsonify({'message': 'Keranjang kosong.'}), 400
@@ -1484,21 +1553,55 @@ def checkout_cart():
     courses = Course.query.filter(Course.id.in_(course_ids)).all() if course_ids else []
     course_map = {course.id: course for course in courses}
     enrolled_ids = []
+
+    # If user chose Saldo, create Payment records so they appear in history
+    payments_created = []
+
     for item in items:
         course = course_map.get(item.course_id)
         if not course:
             db.session.delete(item)
             continue
+
         enrollment = Enrollment.query.filter_by(user_id=current_user.id, course_id=course.id).first()
         if not enrollment:
             enrollment = Enrollment(user_id=current_user.id, course_id=course.id, unlocked=True)
             db.session.add(enrollment)
         else:
             enrollment.unlocked = True
+
+        # Create a Payment record when paying with saldo
+        if payment_method == 'saldo':
+            ts = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+            order_id = f"SALDO-{current_user.id}-{ts}-{course.id}"
+            payment_data = {
+                'method': 'saldo',
+                'course_title': course.title,
+                'note': 'Paid using internal saldo (backup)'
+            }
+            p = Payment(
+                order_id=order_id,
+                user_id=current_user.id,
+                course_id=course.id,
+                gross_amount=Decimal(course.price or 0),
+                payment_type='saldo',
+                transaction_status='settlement',
+                transaction_time=datetime.utcnow(),
+                settlement_time=datetime.utcnow(),
+                payment_data=json.dumps(payment_data)
+            )
+            db.session.add(p)
+            payments_created.append(order_id)
+
         enrolled_ids.append(course.id)
         db.session.delete(item)
+
     db.session.commit()
-    return jsonify({'success': True, 'enrolled_course_ids': enrolled_ids})
+
+    response = {'success': True, 'enrolled_course_ids': enrolled_ids}
+    if payments_created:
+        response['payments'] = payments_created
+    return jsonify(response)
 
 @app.route('/instructor')
 @login_required
@@ -2424,41 +2527,42 @@ def certificate(course_id):
         return redirect(url_for('course_detail', course_id=course_id))
     return render_template('certificate.html', user=current_user, course=c, date=datetime.utcnow().date())
 
+# Register Payment Blueprint
+try:
+    from routes.payment_routes import payment_bp
+    app.register_blueprint(payment_bp)
+    app.logger.info('Payment routes registered successfully')
+    print("✓ Payment blueprint registered successfully")
+except Exception as e:
+    import traceback
+    app.logger.error(f'Failed to register payment routes: {str(e)}')
+    app.logger.error(traceback.format_exc())
+    print(f"✗ ERROR REGISTERING PAYMENT ROUTES: {e}")
+    traceback.print_exc()
+
+# Register Cart Payment Blueprint
+try:
+    from routes.cart_payment_routes import cart_payment_bp
+    app.register_blueprint(cart_payment_bp)
+    app.logger.info('Cart payment routes registered successfully')
+    print("✓ Cart payment blueprint registered successfully")
+except Exception as e:
+    import traceback
+    app.logger.error(f'Failed to register cart payment routes: {str(e)}')
+    app.logger.error(traceback.format_exc())
+    print(f"✗ ERROR REGISTERING CART PAYMENT ROUTES: {e}")
+    traceback.print_exc()
+
+# Debug: Print registered routes
+print("\n=== REGISTERED ROUTES ===")
+for rule in app.url_map.iter_rules():
+    if 'payment' in rule.endpoint.lower():
+        print(f"  {rule.endpoint} -> {rule.rule}")
+print("========================\n")
+    
 if __name__ == '__main__':
     is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
-    app.run(debug=is_debug)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    app.run(debug=is_debug, use_reloader=False)
 
 
 
