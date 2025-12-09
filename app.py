@@ -59,6 +59,17 @@ else:
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# Custom Jinja filter for line breaks
+@app.template_filter('nl2br')
+def nl2br_filter(text):
+    """Convert newlines to HTML line breaks."""
+    if not text:
+        return ''
+    # Escape HTML to prevent XSS, then convert newlines to <br>
+    from markupsafe import Markup, escape
+    return Markup(str(escape(text)).replace('\n', '<br>'))
+
 # Setup rotating file log handler
 LOG_DIR = Path(app.root_path) / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
@@ -77,8 +88,11 @@ THUMBNAIL_UPLOAD_DIR = Path(app.static_folder) / 'uploads' / 'thumbnails'
 ALLOWED_CERTIFICATE_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 CERTIFICATE_UPLOAD_DIR = Path(app.static_folder) / 'uploads' / 'certificates'
 
+# Memanggil API OpenRouter untuk mendapatkan jawaban AI berbasis chat completion.
+# Fungsi ini menerima daftar pesan percakapan dan mengembalikan teks balasan
+# yang sudah difilter dari konten reasoning/chain-of-thought agar aman untuk ditampilkan ke user.
 def call_openrouter(messages, *, max_tokens=600):
-    """Kirim permintaan ke OpenRouter dan kembalikan respons teks."""
+    """Kirim permintaan ke OpenRouter dan kembalikan respons teks yang siap ditampilkan."""
     if os.getenv('AI_PROVIDER', '').lower() != 'openrouter':
         app.logger.warning('AI_PROVIDER bukan openrouter; chatbot dinonaktifkan.')
         return None
@@ -209,24 +223,6 @@ PLATFORM_FEATURES_CONTEXT = (
     "Dashboard utama menampilkan ringkasan kursus aktif, progres belajar, dan pintasan menuju tugas atau materi terbaru sesuai peran pengguna. "
     "Menu Lihat Kursus menampilkan katalog lengkap dengan pencarian, filter materi, dan status premium agar pengguna mudah menelusuri program yang tersedia."
 )
-
-def load_knowledge_base(filename: str) -> str:
-    """Load konten file knowledge base dari folder AI/knowledge_base."""
-    try:
-        file_path = Path(app.root_path) / 'AI' / 'knowledge_base' / filename
-        if file_path.exists():
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        else:
-            app.logger.warning(f'Knowledge base file not found: {filename}')
-            return ""
-    except Exception as e:
-        app.logger.error(f'Error loading knowledge base {filename}: {e}')
-        return ""
-
-# Knowledge base loading helper
-def get_knowledge_base_content(filename: str) -> str:
-    return load_knowledge_base(filename)
 
 def build_catalog_context() -> str:
     """Ambil ringkasan kursus untuk dimasukkan ke prompt AI."""
@@ -431,35 +427,17 @@ def build_chat_messages(user_message: str, *, user=None, include_history=True) -
     
     # Role-specific features context
     if getattr(user, 'role', None) == 'student':
-        # Inject Student Guides dari file eksternal (Dynamic Load)
-        student_guides = get_knowledge_base_content('student_guides.md')
-        if student_guides:
-            system_message += f"\n\n=== PANDUAN LENGKAP SISWA ===\n{student_guides}\n==============================\n"
-        else:
-            system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
-            
+        system_message += ' Panduan fitur siswa: ' + STUDENT_FEATURES_CONTEXT
         # Student: tampilkan katalog semua kursus
         catalog_context = build_catalog_context()
         if catalog_context:
             system_message += ' Informasi katalog: ' + catalog_context
-            
     elif getattr(user, 'role', None) == 'instructor':
-        # Inject Instructor Guides dari file eksternal (Dynamic Load)
-        instructor_guides = get_knowledge_base_content('instructor_guides.md')
-        if instructor_guides:
-            system_message += f"\n\n=== PANDUAN LENGKAP INSTRUKTUR ===\n{instructor_guides}\n==============================\n"
-        else:
-            system_message += ' Panduan fitur instruktur: ' + INSTRUCTOR_FEATURES_CONTEXT
-            
+        system_message += ' Panduan fitur instruktur: ' + INSTRUCTOR_FEATURES_CONTEXT
         # Instructor: tampilkan kursus yang mereka buat
         instructor_context = build_instructor_context(user.id)
         if instructor_context:
             system_message += ' Kursus Anda: ' + instructor_context
-
-    # Inject General Guides untuk semua user (Dynamic Load)
-    general_guides = get_knowledge_base_content('general_guides.md')
-    if general_guides:
-        system_message += f"\n\n=== PANDUAN UMUM ===\n{general_guides}\n====================\n"
 
 
     messages = [{'role': 'system', 'content': system_message}]
@@ -1832,7 +1810,7 @@ def delete_course(course_id):
     CartItem.query.filter_by(course_id=course_id).delete(synchronize_session=False)
     ExerciseSubmission.query.filter_by(course_id=course_id).delete(synchronize_session=False)
     Exercise.query.filter_by(course_id=course_id).delete(synchronize_session=False)
-
+    Payment.query.filter_by(course_id=course_id).delete(synchronize_session=False)
     db.session.delete(course)
     db.session.commit()
     

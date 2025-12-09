@@ -94,6 +94,11 @@
                     <td style="padding: 15px; text-align: center;">
                         {% if payment.transaction_status in ['pending', 'expire'] %}
                         <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap;">
+                            <button onclick="checkStatus('{{ payment.order_id }}')"
+                                style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s; white-space: nowrap;"
+                                title="Refresh status pembayaran dari Midtrans">
+                                🔄 Cek Status
+                            </button>
                             <a href="{{ url_for('payment.payment_invoice', order_id=payment.order_id) }}"
                                 target="_blank" rel="noopener"
                                 style="background: #17a2b8; color: white; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">
