@@ -59,6 +59,17 @@ else:
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# Custom Jinja filter for line breaks
+@app.template_filter('nl2br')
+def nl2br_filter(text):
+    """Convert newlines to HTML line breaks."""
+    if not text:
+        return ''
+    # Escape HTML to prevent XSS, then convert newlines to <br>
+    from markupsafe import Markup, escape
+    return Markup(str(escape(text)).replace('\n', '<br>'))
+
 # Setup rotating file log handler
 LOG_DIR = Path(app.root_path) / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
@@ -1799,7 +1810,7 @@ def delete_course(course_id):
     CartItem.query.filter_by(course_id=course_id).delete(synchronize_session=False)
     ExerciseSubmission.query.filter_by(course_id=course_id).delete(synchronize_session=False)
     Exercise.query.filter_by(course_id=course_id).delete(synchronize_session=False)
-
+    Payment.query.filter_by(course_id=course_id).delete(synchronize_session=False)
     db.session.delete(course)
     db.session.commit()
     
